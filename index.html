@@ -215,7 +215,24 @@ button{font-family:inherit;color:inherit}
   .opt{min-height:44px;padding:6px 8px}
   .lv{min-height:58px}
 }
+/* title screen */
+.overlay.splash{background:linear-gradient(180deg,rgba(20,40,110,.15),rgba(20,40,110,0) 40%,rgba(10,30,20,.25));flex-direction:column;justify-content:center;gap:2vh}
+.splash .logo{transform:scale(1.25);margin:0 auto 4vh;animation:logoIn .7s cubic-bezier(.2,1.5,.5,1)}
+@keyframes logoIn{from{transform:scale(.4) translateY(-40px);opacity:0}to{transform:scale(1.25);opacity:1}}
+.splash .tag2{font-weight:800;font-size:clamp(16px,3.6vw,22px);color:#fff;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;text-align:center;text-wrap:balance}
+.splash .start{font-size:26px;padding:12px 40px;animation:pulse 1.4s ease-in-out infinite;margin:0 auto}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.splash .ver{position:absolute;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom,0px));text-align:center;font-weight:700;font-size:14px;color:#fff;-webkit-text-stroke:4px var(--ink);paint-order:stroke fill}
+.demo{position:absolute;pointer-events:none;will-change:transform}
+.demo svg{width:100%;height:auto;overflow:visible;display:block}
+.demo .leg1{animation:leg .34s infinite alternate ease-in-out;transform-origin:56px 116px}
+.demo .leg2{animation:leg .34s infinite alternate-reverse ease-in-out;transform-origin:76px 116px}
+.demo .bob{animation:bob .17s infinite alternate ease-in-out}
+.demo.march{animation:march linear infinite}
+@keyframes march{0%{transform:translateX(-30vw);opacity:1}88%{opacity:1}100%{transform:translateX(var(--to,60vw));opacity:0}}
+.verline{text-align:center;font-size:12px;font-weight:600;opacity:.55;margin-top:8px}
 @media (prefers-reduced-motion:reduce){
+  .splash .start,.splash .logo,.demo.march{animation:none}
   .cloud{animation:none}
   .chk .leg1,.chk .leg2,.chk .bob{animation:none}
   .pop-in{animation:none}
@@ -334,6 +351,7 @@ const MODES = {
   hard:{name:'Khó',per:3,dur:12,total:18,gap:2.6},
 };
 const DMG = 25;
+const VERSION = 5;
 
 /* ================= STORAGE ================= */
 const SKEY='bangavocab_v1';
@@ -786,7 +804,7 @@ addEventListener('keydown',e=>{
 });
 
 /* ================= OVERLAYS ================= */
-function showOverlay(html,top){ovl.innerHTML=`<div class="overlay ${top?'top':''}">${html}</div>`}
+function showOverlay(html,top,cls=''){ovl.innerHTML=`<div class="overlay ${top?'top':''} ${cls}">${html}</div>`}
 function closeOverlay(){ovl.innerHTML=''}
 function togglePause(){
   if(!G||G.over||G.modal) return;
@@ -836,6 +854,7 @@ function menu(){
     </div>
     <button class="btn big" id="playBtn">Bảo vệ thành!</button>
     <button class="btn blue" id="boardBtn" style="width:100%;margin-top:8px;font-size:18px;padding:8px">Bảng xếp hạng</button>
+    <div class="verline">Xingxing · Phiên bản ${VERSION}</div>
   </div>`);
   const mh=()=>{const m=MODES[save.set.mode]; $('#modeHint').textContent=`${m.per===1?'Mỗi lượt 1 con gà':'Tối đa '+m.per+' con gà cùng lúc'}, ${m.dur} giây để chạy tới tường. Chạm vào gà để trả lời, đúng thì đại bác bắn hạ. Tường thành chịu được 3 lần húc, lần thứ 4 là thua. Cần trụ qua ${m.total} con gà.`};
   mh();
@@ -961,6 +980,22 @@ function endGame(win){
   }, win?300:900);
 }
 
-if(save.name) menu(); else askName(menu);
+function splash(){
+  const rows=[0.62,0.74,0.86];
+  const demos=[0,1,2,3,4].map(i=>{
+    const y=H*rows[i%3]+(i>2?H*0.04:0), sz=chickenSize(y)*1.05, dur=14+i*2.5;
+    return `<div class="demo march" style="left:0;top:${(y-sz*150/140).toFixed(0)}px;width:${sz.toFixed(0)}px;z-index:${Math.round(y)};animation-duration:${dur}s;animation-delay:-${(i*3.7).toFixed(1)}s;--to:${(W-wallW-sz*0.45).toFixed(0)}px">${chickenSVG(LOOKS[(i*3)%LOOKS.length])}</div>`;
+  }).join('');
+  showOverlay(`${demos}
+    <div style="position:relative;z-index:2000;display:flex;flex-direction:column;align-items:center;gap:2.2vh">
+      <div class="logo"><span class="t">XINGXING</span><span class="s">BẮN GÀ · HỌC TỪ VỰNG</span></div>
+      <div class="tag2">Tiếng Trung HSK 1-6 · Tiếng Anh sơ cấp đến cao cấp</div>
+      <button class="btn start" id="startBtn">Bắt đầu</button>
+    </div>
+    <div class="ver">Phiên bản ${VERSION}</div>`,false,'splash');
+  const go=()=>{ ac(); if(save.name) menu(); else askName(menu); };
+  $('#startBtn').onclick=go;
+}
+splash();
 </script>
 </html>
