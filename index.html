@@ -831,7 +831,7 @@ function menu(){
     </div>
     <div class="hint" id="modeHint"></div>
     <div class="row" style="justify-content:space-between">
-      <button class="chip" id="nameBtn"><span class="who">Tài khoản: <b>${esc(save.name||'bấm để nhập tên')}</b></span></button>
+      <button class="chip" id="nameBtn"><span class="who">Tài khoản: <b>${esc(save.name||'bấm để nhập tên')}</b>${save.name?' <span style="opacity:.6;font-weight:600">· đổi tên</span>':''}</span></button>
       <span class="chip" style="cursor:default">${GEM} ${save.gems} Gem</span>
     </div>
     <button class="btn big" id="playBtn">Bảo vệ thành!</button>
@@ -848,15 +848,32 @@ function menu(){
   $('#boardBtn').onclick=()=>showBoard(save.set.lv,menu);
   $('#nameBtn').onclick=()=>askName(menu);
 }
+const NAME_MAX=20, RENAME_COST=5;
+function renameCost(){ return !save.name ? 0 : ((save.renames||0)<1 ? 0 : RENAME_COST); }
 function askName(back){
-  showOverlay(`<div class="card pop-in" style="max-width:420px"><h2>Nhập tên tài khoản</h2>
-    <div class="hint">Tên này hiện trên bảng xếp hạng chung. Sau mỗi màn, điểm của bạn tự động được lưu vào tên này. Tối đa 16 ký tự.</div>
-    <form class="namein" id="nmForm"><input id="nmIn" maxlength="16" value="${esc(save.name)}" placeholder="vd: ChenChen" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">Lưu</button></form>
-    <div class="btns"><button class="btn alt" id="nmBack">${save.name?'Quay lại':'Để sau'}</button></div></div>`);
-  $('#nmForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#nmIn').value); if(!v) return; save.name=v; persist(); back();};
+  const first=!save.name, cost=renameCost();
+  const note=first?'Tên này hiện trên bảng xếp hạng chung. Sau mỗi màn, điểm của bạn tự động được lưu vào tên này.'
+    : cost?`Bạn đã dùng lượt đổi tên miễn phí. Lần này tốn ${GEM}${cost} Gem (đang có ${save.gems}).`
+    : 'Lần đổi tên đầu tiên miễn phí. Từ lần sau mỗi lần đổi tốn '+RENAME_COST+' Gem.';
+  showOverlay(`<div class="card pop-in" style="max-width:420px"><h2>${first?'Nhập tên tài khoản':'Đổi tên tài khoản'}</h2>
+    <div class="hint">${note} Tối đa ${NAME_MAX} ký tự.</div>
+    <form class="namein" id="nmForm"><input id="nmIn" maxlength="${NAME_MAX}" value="${esc(save.name)}" placeholder="vd: ChenChen" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">${cost?`Đổi (${GEM}${cost})`:'Lưu'}</button></form>
+    <div class="subline" id="nmMsg"></div>
+    <div class="btns"><button class="btn alt" id="nmBack">${first?'Để sau':'Quay lại'}</button></div></div>`);
+  $('#nmForm').onsubmit=e=>{e.preventDefault();
+    const v=cleanName($('#nmIn').value); if(!v) return;
+    if(v===save.name){ back(); return; }
+    if(!first){
+      if(cost && save.gems<cost){ $('#nmMsg').textContent=`Cần ${cost} Gem để đổi tên, bạn đang có ${save.gems}.`; SFX.bad(); return; }
+      save.gems-=cost; save.renames=(save.renames||0)+1;
+    }
+    save.name=v; persist();
+    if(!first) api('POST',{action:'rename',id:save.pid,name:v}).catch(()=>{});
+    back();
+  };
   $('#nmBack').onclick=back;
 }
-const cleanName=v=>v.replace(/[\u0000-\u001f<>]/g,'').replace(/\s+/g,' ').trim().slice(0,16);
+const cleanName=v=>v.replace(/[\u0000-\u001f<>]/g,'').replace(/\s+/g,' ').trim().slice(0,NAME_MAX);
 
 /* ================= LEADERBOARD ================= */
 const API='/api/scores';
@@ -938,7 +955,7 @@ function endGame(win){
     if(G.score<=0){ box.innerHTML=''; }
     else if(save.name) send();
     else {
-      box.innerHTML=`<div class="subline">Nhập tên tài khoản để lưu điểm (các màn sau sẽ tự lưu):</div><form class="namein" id="subForm"><input id="subName" maxlength="16" placeholder="Tên của bạn" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">Lưu điểm</button></form>`;
+      box.innerHTML=`<div class="subline">Nhập tên tài khoản để lưu điểm (các màn sau sẽ tự lưu):</div><form class="namein" id="subForm"><input id="subName" maxlength="20" placeholder="Tên của bạn" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">Lưu điểm</button></form>`;
       $('#subForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#subName').value); if(!v) return; save.name=v; persist(); send();};
     }
   }, win?300:900);

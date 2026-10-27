@@ -1,6 +1,7 @@
 // Shared leaderboard for Xingxing, stored in Upstash Redis (Vercel Storage → Upstash for Redis).
 // GET  /api/scores?board=all|hsk1..hsk6|en1..en3&me=<playerId>  → { top:[{id,name,score}], me:{rank,score}|null }
 // POST /api/scores {id,name,level,mode,score}                    → { rankAll, rankLevel, total, best }
+// POST /api/scores {action:'rename',id,name}                      → { ok }
 
 const BOARDS = ['all', 'hsk1', 'hsk2', 'hsk3', 'hsk4', 'hsk5', 'hsk6', 'en1', 'en2', 'en3'];
 const MODES = ['easy', 'normal', 'hard'];
@@ -36,7 +37,7 @@ async function redis(cmds) {
 const key = (b) => 'xx:lb:' + b;
 const validId = (s) => typeof s === 'string' && /^[a-z0-9]{6,32}$/.test(s);
 const cleanName = (s) =>
-  String(s || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+  String(s || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20);
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -64,6 +65,12 @@ module.exports = async (req, res) => {
     if (req.method === 'POST') {
       const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
       const name = cleanName(b.name);
+      if (b.action === 'rename') {
+        if (!validId(b.id) || !name) return res.status(400).json({ error: 'bad request' });
+        const [known] = await redis([['HEXISTS', 'xx:names', b.id]]);
+        if (known) await redis([['HSET', 'xx:names', b.id, name]]);
+        return res.status(200).json({ ok: true });
+      }
       const score = Math.floor(Number(b.score));
       if (!validId(b.id) || !name || !BOARDS.includes(b.level) || b.level === 'all' || !MODES.includes(b.mode))
         return res.status(400).json({ error: 'bad request' });
