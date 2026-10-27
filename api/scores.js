@@ -7,8 +7,17 @@ const MODES = ['easy', 'normal', 'hard'];
 const MAX_SCORE = 1000; // one round can't reach this (18 chickens x 30 points max)
 const TOP = 50;
 
-const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+// The Vercel integration may add a custom prefix (e.g. STORAGE_KV_REST_API_URL), so match by suffix.
+function envBySuffix(suffixes) {
+  for (const suf of suffixes) {
+    if (process.env[suf]) return process.env[suf];
+    const k = Object.keys(process.env).find((name) => name.endsWith('_' + suf));
+    if (k) return process.env[k];
+  }
+  return '';
+}
+const URL_ = envBySuffix(['KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL']);
+const TOKEN = envBySuffix(['KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN']);
 
 async function redis(cmds) {
   const r = await fetch(URL_.replace(/\/$/, '') + '/pipeline', {
