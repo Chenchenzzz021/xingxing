@@ -149,6 +149,7 @@ button{font-family:inherit;color:inherit}
 .btn.big{width:100%;margin-top:14px;font-size:24px;padding:12px}
 .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .btns .btn{flex:1 1 140px}
+.btns.col{flex-direction:column}.btns.col .btn{flex:none}
 :focus-visible{outline:3px solid var(--royal2);outline-offset:2px}
 
 /* question card */
@@ -199,6 +200,8 @@ button{font-family:inherit;color:inherit}
   .card{padding:14px;border-radius:20px}
   #hud{font-size:13px;gap:6px;padding-left:10px}
   #hud .hide-s{display:none}
+  .hp .bar{width:46px}
+  #hHpNum{display:none}
   .opt{font-size:16px;min-height:52px;padding:8px 6px}
   .opt.py{font-size:18px}
   .levels{gap:6px}
@@ -218,6 +221,40 @@ button{font-family:inherit;color:inherit}
   .pop-in{animation:none}
 }
 #stage.paused .chk *,#stage.paused .cloud{animation-play-state:paused}
+[hidden]{display:none!important}
+.card{min-width:0}
+.subline a{color:var(--royal);font-weight:800}
+.gi{width:1.05em;height:1.05em;vertical-align:-.17em;flex:none}
+#timeBtn{position:absolute;z-index:7000;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:6px;border:3px solid var(--ink);border-radius:999px;background:var(--paper);box-shadow:0 4px 0 var(--ink);padding:6px 12px 6px 8px;font-weight:800;font-size:16px;cursor:pointer;touch-action:manipulation}
+#timeBtn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+#timeBtn .clk{width:26px;height:26px}
+#timeBtn .cost{display:flex;align-items:center;gap:2px;font-size:13px;background:var(--cream);border:2px solid var(--ink);border-radius:999px;padding:0 6px}
+#timeBtn.no{opacity:.55}
+.qtools{display:flex;justify-content:center;gap:8px;margin:-4px 0 10px;flex-wrap:wrap}
+.tool{display:flex;align-items:center;gap:6px;border:3px solid var(--ink);border-radius:999px;background:var(--gold);padding:4px 12px;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 3px 0 var(--ink)}
+.tool:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.tool[disabled]{background:#eee;opacity:.6;cursor:default;box-shadow:none}
+.tool .cost{display:flex;align-items:center;gap:2px;font-size:13px;background:#fff;border:2px solid var(--ink);border-radius:999px;padding:0 6px}
+.opt.gone{opacity:.25;pointer-events:none}
+.hintline{text-align:center;font-weight:700;font-size:17px;margin:-4px 0 10px;color:var(--royal)}
+.gembar{display:flex;align-items:center;justify-content:center;gap:6px;font-weight:800;font-size:17px;margin:4px 0}
+.who{display:flex;align-items:center;gap:6px}
+.lbtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:10px 0 6px;-webkit-overflow-scrolling:touch}
+.lbtabs button{flex:none;border:2.5px solid var(--ink);border-radius:999px;background:#fff;padding:4px 12px;font-weight:700;font-size:14px;cursor:pointer}
+.lbtabs button[aria-pressed="true"]{background:var(--royal2);color:#fff}
+.lb{list-style:none;margin:0;padding:0;border:3px solid var(--ink);border-radius:14px;background:#fff;max-height:min(52vh,420px);overflow-y:auto}
+.lb li{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:2px dashed rgba(42,35,32,.15);font-weight:700;font-size:16px}
+.lb li:last-child{border-bottom:none}
+.lb li.me{background:#fff3c4}
+.lb .rk{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:2.5px solid var(--ink);background:var(--cream);font-size:14px;font-variant-numeric:tabular-nums}
+.lb li:nth-child(1) .rk{background:#ffd34d}.lb li:nth-child(2) .rk{background:#dfe6ee}.lb li:nth-child(3) .rk{background:#f0b27a}
+.lb .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb .sc{font-variant-numeric:tabular-nums;color:var(--royal)}
+.lbmsg{padding:18px 12px;text-align:center;font-weight:600;line-height:1.4}
+.namein{display:flex;gap:8px;margin-top:10px}
+.namein input{flex:1;min-width:0;border:3px solid var(--ink);border-radius:14px;padding:8px 12px;font-size:18px;font-family:var(--display);font-weight:600;background:#fff;color:var(--ink)}
+.namein .btn{font-size:17px;padding:6px 14px}
+.subline{font-weight:700;font-size:15px;margin-top:8px;min-height:1.3em}
 </style>
 
 <div id="stage">
@@ -252,9 +289,10 @@ button{font-family:inherit;color:inherit}
     <span class="lvl" id="hLvl">HSK 1</span><span class="sep hide-s"></span>
     <span class="num" id="hCount" aria-label="Số gà">🐔 0/10</span><span class="sep"></span>
     <span class="hp" id="hHp"><span class="bar"><i id="hHpBar" style="width:100%"></i></span><span class="num" id="hHpNum">100</span></span><span class="sep"></span>
-    <span class="num" id="hScore">0</span>
+    <span class="num" id="hScore">0</span><span class="sep"></span><span class="num" id="hGem">0</span>
     <button class="ibtn" id="pauseBtn" aria-label="Tạm dừng"><svg viewBox="0 0 16 16"><rect x="3" y="2" width="3.5" height="12" rx="1" fill="#2a2320"/><rect x="9.5" y="2" width="3.5" height="12" rx="1" fill="#2a2320"/></svg></button>
   </div>
+  <button id="timeBtn" hidden aria-label="Thêm 10 giây cho gà đang chạy"><svg class="clk" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="14" r="10" fill="#fff" stroke="#2a2320" stroke-width="3"/><path d="M13 8v6l4 3" fill="none" stroke="#2a2320" stroke-width="3" stroke-linecap="round"/><path d="M10 2h6" stroke="#2a2320" stroke-width="3" stroke-linecap="round"/></svg>+10s<span class="cost" id="timeCost"></span></button>
   <div id="ovl"></div>
 </div>
 
@@ -299,9 +337,14 @@ const DMG = 25;
 
 /* ================= STORAGE ================= */
 const SKEY='bangavocab_v1';
-let save={best:{},used:{},set:{lang:'zh',lv:'hsk1',mode:'easy',type:true,sound:true}};
+let save={best:{},used:{},gems:5,pid:'',name:'',pending:[],set:{lang:'zh',lv:'hsk1',mode:'easy',type:true,sound:true}};
 try{const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s) save=Object.assign(save,s,{set:Object.assign(save.set,s.set||{})});}catch(e){}
 function persist(){try{localStorage.setItem(SKEY,JSON.stringify(save))}catch(e){}}
+if(!save.pid){save.pid=(Date.now().toString(36)+Math.random().toString(36).slice(2,10)).slice(0,20); persist();}
+if(!Array.isArray(save.pending)) save.pending=[];
+const COST={hint:2,time:1};
+const GEM='<svg class="gi" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h10l4 5-9 11L1 7z" fill="#36c5f0" stroke="#2a2320" stroke-width="1.8" stroke-linejoin="round"/><path d="M1 7h18M7 2 5 7l5 11 5-11-2-5" fill="none" stroke="#2a2320" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+function spend(n){ if(save.gems<n){ toast('Không đủ Gem. Trả lời đúng để nhận thêm Gem nhé!'); SFX.bad(); return false;} save.gems-=n; persist(); hud(); return true; }
 
 /* ================= HELPERS ================= */
 const $=s=>document.querySelector(s);
@@ -481,18 +524,22 @@ function startGame(){
   const level=LEVELS.find(l=>l.id===save.set.lv), mode=MODES[save.set.mode];
   if(G) for(const c of G.chks) c.el.remove();
   stage.querySelectorAll('.ball,.puff,.float,.toast').forEach(e=>e.remove());
-  G={level,mode,words:pickWords(level,mode.total),hp:100,score:0,combo:0,spawned:0,resolved:0,chks:[],t:0,lastSpawn:-99,paused:false,modal:null,log:[],over:false,qn:0};
+  G={level,mode,words:pickWords(level,mode.total),hp:100,score:0,combo:0,spawned:0,resolved:0,chks:[],t:0,lastSpawn:-99,paused:false,modal:null,log:[],over:false,qn:0,gemsEarned:0};
   wall.className='';
-  $('#hud').hidden=false; hud(); closeOverlay();
+  $('#hud').hidden=false; $('#timeBtn').hidden=false; hud(); closeOverlay();
   last=performance.now(); stage.classList.remove('paused');
 }
+const lvName=l=>(l.lang==='en'?'Anh ':'')+l.name;
 function hud(){
+  $('#timeCost').innerHTML=GEM+COST.time;
   if(!G) return;
-  $('#hLvl').textContent=G.level.name+' · '+G.mode.name;
+  $('#hLvl').textContent=lvName(G.level)+(W<520?'':' · '+G.mode.name);
   $('#hCount').textContent='🐔 '+G.resolved+'/'+G.mode.total;
   $('#hHpBar').style.width=G.hp+'%'; $('#hHpNum').textContent=G.hp;
   $('#hHp').classList.toggle('low',G.hp<=25);
   $('#hScore').textContent='★ '+G.score;
+  $('#hGem').innerHTML=GEM+' '+save.gems;
+  $('#timeBtn').classList.toggle('no',save.gems<COST.time);
   wall.classList.toggle('d1',G.hp<=75&&G.hp>50); wall.classList.toggle('d2',G.hp<=50&&G.hp>25); wall.classList.toggle('d3',G.hp<=25);
 }
 
@@ -547,7 +594,7 @@ function loop(now){
       if(c.state==='run'){
         const left=Math.max(0,c.dur-(G.t-c.start));
         c.qEl.textContent=Math.ceil(left);
-        c.bar.style.transform=`scaleX(${left/c.dur})`;
+        c.bar.style.transform=`scaleX(${Math.min(1,left/(c.full||c.dur))})`;
         c.el.classList.toggle('warn',left<=5);
       }
       if(p>=1) hitWall(c);
@@ -659,16 +706,33 @@ function openQuestion(c){
     <div class="qhead"><span class="pill">Gà số ${G.resolved+1}/${G.mode.total}</span><span>${G.level.name}</span></div>
     <div class="word"><div class="w ${q.showCls}">${esc(q.show)}</div>${canSay?`<button class="say" id="sayBtn" aria-label="Nghe phát âm">${SPK}</button>`:''}</div>
     <div class="prompt">${esc(q.prompt)}</div>
+    <div class="qtools"><button class="tool" id="hintBtn" ${save.gems<COST.hint?'disabled':''}>Gợi ý <span class="cost">${GEM}${COST.hint}</span></button></div>
+    <div id="hintLine"></div>
     ${body}
     <div id="fb"></div>
   </div>`, !!q.input);
   if(canSay) $('#sayBtn').onclick=()=>speak(sayTxt,q.lang);
+  $('#hintBtn').onclick=()=>useHint();
   if(q.input){
     const inp=$('#tin');
     setTimeout(()=>{try{inp.focus({preventScroll:true})}catch(e){}},60);
     $('#tform').onsubmit=e=>{e.preventDefault(); if(!inp.value.trim()) return; checkTyped(inp.value)};
   } else {
     ovl.querySelectorAll('.opt').forEach(b=>b.onclick=()=>checkChoice(b));
+  }
+}
+function useHint(){
+  const M=G.modal; if(!M||M.done||M.hinted) return;
+  if(!spend(COST.hint)) return;
+  M.hinted=true; $('#hintBtn').disabled=true; SFX.open();
+  const q=M.q;
+  if(q.input){
+    const a=q.answer, k=Math.ceil(a.length/2);
+    const shown=a.slice(0,k)+a.slice(k).replace(/[^\s']/g,'_');
+    $('#hintLine').innerHTML=`<div class="hintline ${q.lang==='zh'?'py-t':''}">${esc(shown)}</div>`;
+  } else {
+    const wrong=shuffle([...ovl.querySelectorAll('.opt')].filter(b=>b.dataset.v!==q.answer)).slice(0,2);
+    wrong.forEach(b=>{b.classList.add('gone'); b.disabled=true;});
   }
 }
 function checkChoice(btn){
@@ -697,7 +761,7 @@ function answered(ok,exact){
   if(ok){
     G.combo++;
     let pts=10+(quick?5:0)+(exact?5:0)+Math.min(10,(G.combo-1)*2);
-    G.score+=pts; G.log.push({w,ok:true}); c.logged=true;
+    G.score+=pts; G.log.push({w,ok:true}); c.logged=true; G.gemsEarned++;
     SFX.ok(); speak(G.level.lang==='zh'?w.h:w.en,G.level.lang);
     const extra=[exact?'Chuẩn cả thanh điệu! +5':'',quick?'Nhanh tay! +5':'',G.combo>1?`Liên hoàn x${G.combo}`:''].filter(Boolean).join(' · ');
     fb.innerHTML=`<div class="fb ok"><b>Đúng rồi! +${pts}</b>${extra?' <span style="opacity:.8">('+extra+')</span>':''}<br>${revealLine(w)}</div>`;
@@ -729,17 +793,26 @@ function togglePause(){
   if(!G.paused){
     G.paused=true; stage.classList.add('paused');
     showOverlay(`<div class="card pop-in" style="max-width:380px;text-align:center"><h2>Tạm dừng</h2>
-      <div class="btns" style="flex-direction:column"><button class="btn blue" id="pResume">Chơi tiếp</button><button class="btn alt" id="pRestart">Chơi lại (từ mới)</button><button class="btn alt" id="pMenu">Về menu</button></div></div>`);
+      <div class="btns col"><button class="btn blue" id="pResume">Chơi tiếp</button><button class="btn alt" id="pRestart">Chơi lại ${esc(lvName(G.level))} · ${G.mode.name}</button><button class="btn alt" id="pMenu">Về menu</button></div></div>`);
     $('#pResume').onclick=togglePause; $('#pRestart').onclick=startGame; $('#pMenu').onclick=menu;
   } else { G.paused=false; stage.classList.remove('paused'); closeOverlay(); last=performance.now(); }
 }
 $('#pauseBtn').onclick=togglePause;
+$('#timeBtn').addEventListener('click',()=>{
+  if(!G||G.paused||G.over) return;
+  const run=G.chks.filter(c=>c.state==='run');
+  if(!run.length){ toast('Chưa có con gà nào đang chạy.'); return; }
+  if(!spend(COST.time)) return;
+  for(const c of run){ const left=Math.max(0,c.dur-(G.t-c.start)); c.x0=c.x; c.start=G.t; c.dur=left+10; c.full=c.dur; }
+  SFX.open(); floatText(W*0.25,H*0.55,'+10 giây');
+});
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&G&&!G.paused&&!G.over&&!G.modal) togglePause(); });
 
 function starsFor(level){const b=save.best[level.id]; const n=b?b.stars:0; return [0,1,2].map(i=>`<span class="${i<n?'':'off'}">★</span>`).join('')}
 function menu(){
   if(G){ for(const c of G.chks) c.el.remove(); G=null; }
-  $('#hud').hidden=true; stage.classList.remove('paused');
+  $('#hud').hidden=true; $('#timeBtn').hidden=true; stage.classList.remove('paused');
+  flushPending();
   const s=save.set;
   const levels=LEVELS.filter(l=>l.lang===s.lang);
   showOverlay(`<div class="card pop-in">
@@ -757,7 +830,12 @@ function menu(){
       <button class="chip" id="optSound" aria-pressed="${s.sound}"><span class="box"></span>Âm thanh</button>
     </div>
     <div class="hint" id="modeHint"></div>
+    <div class="row" style="justify-content:space-between">
+      <button class="chip" id="nameBtn"><span class="who">Tài khoản: <b>${esc(save.name||'bấm để nhập tên')}</b></span></button>
+      <span class="chip" style="cursor:default">${GEM} ${save.gems} Gem</span>
+    </div>
     <button class="btn big" id="playBtn">Bảo vệ thành!</button>
+    <button class="btn blue" id="boardBtn" style="width:100%;margin-top:8px;font-size:18px;padding:8px">Bảng xếp hạng</button>
   </div>`);
   const mh=()=>{const m=MODES[save.set.mode]; $('#modeHint').textContent=`${m.per===1?'Mỗi lượt 1 con gà':'Tối đa '+m.per+' con gà cùng lúc'}, ${m.dur} giây để chạy tới tường. Chạm vào gà để trả lời, đúng thì đại bác bắn hạ. Tường thành chịu được 3 lần húc, lần thứ 4 là thua. Cần trụ qua ${m.total} con gà.`};
   mh();
@@ -767,12 +845,64 @@ function menu(){
   $('#optType').onclick=e=>{save.set.type=!save.set.type; persist(); e.currentTarget.setAttribute('aria-pressed',save.set.type)};
   $('#optSound').onclick=e=>{save.set.sound=!save.set.sound; persist(); e.currentTarget.setAttribute('aria-pressed',save.set.sound)};
   $('#playBtn').onclick=()=>{ac(); startGame()};
+  $('#boardBtn').onclick=()=>showBoard(save.set.lv,menu);
+  $('#nameBtn').onclick=()=>askName(menu);
+}
+function askName(back){
+  showOverlay(`<div class="card pop-in" style="max-width:420px"><h2>Nhập tên tài khoản</h2>
+    <div class="hint">Tên này hiện trên bảng xếp hạng chung. Sau mỗi màn, điểm của bạn tự động được lưu vào tên này. Tối đa 16 ký tự.</div>
+    <form class="namein" id="nmForm"><input id="nmIn" maxlength="16" value="${esc(save.name)}" placeholder="vd: ChenChen" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">Lưu</button></form>
+    <div class="btns"><button class="btn alt" id="nmBack">${save.name?'Quay lại':'Để sau'}</button></div></div>`);
+  $('#nmForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#nmIn').value); if(!v) return; save.name=v; persist(); back();};
+  $('#nmBack').onclick=back;
+}
+const cleanName=v=>v.replace(/[\u0000-\u001f<>]/g,'').replace(/\s+/g,' ').trim().slice(0,16);
+
+/* ================= LEADERBOARD ================= */
+const API='/api/scores';
+async function api(method,body,qs=''){
+  const r=await fetch(API+qs,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
+}
+async function submitScore(entry){
+  return api('POST',{id:save.pid,name:save.name,level:entry.level,mode:entry.mode,score:entry.score});
+}
+async function flushPending(){
+  if(!save.name||!save.pending.length) return;
+  const list=save.pending.slice(); save.pending=[]; persist();
+  for(const e of list){ try{ await submitScore(e); }catch(err){ save.pending.push(e); } }
+  persist();
+}
+function showBoard(board,back){
+  const tabs=[['all','Tổng điểm']].concat(LEVELS.map(l=>[l.id,(l.lang==='en'?'Anh ':'')+l.name]));
+  if(!tabs.some(t=>t[0]===board)) board='all';
+  showOverlay(`<div class="card pop-in"><h2>Bảng xếp hạng</h2>
+    <div class="hint">${board==='all'?'Tổng điểm cộng dồn của tất cả các màn đã chơi.':'Điểm cao nhất một lượt chơi ở màn này.'}</div>
+    <div class="lbtabs" role="group" aria-label="Chọn bảng">${tabs.map(([k,n])=>`<button data-b="${k}" aria-pressed="${k===board}">${esc(n)}</button>`).join('')}</div>
+    <ul class="lb" id="lbList"><li class="lbmsg" style="display:block">Đang tải...</li></ul>
+    <div class="btns"><button class="btn alt" id="lbBack">Quay lại</button></div></div>`, true);
+  ovl.querySelectorAll('.lbtabs button').forEach(b=>b.onclick=()=>showBoard(b.dataset.b,back));
+  const cur=ovl.querySelector('.lbtabs [aria-pressed="true"]'); if(cur) cur.scrollIntoView({inline:'center',block:'nearest'});
+  $('#lbBack').onclick=back;
+  api('GET',null,`?board=${board}&me=${encodeURIComponent(save.pid)}`).then(d=>{
+    const el=$('#lbList'); if(!el) return;
+    if(!d.top||!d.top.length){ el.innerHTML='<li class="lbmsg" style="display:block">Chưa có ai trên bảng này. Chơi một màn để giành hạng 1!</li>'; return; }
+    let html=d.top.map((r,i)=>`<li class="${r.id===save.pid?'me':''}"><span class="rk">${i+1}</span><span class="nm">${esc(r.name||'Ẩn danh')}</span><span class="sc">${r.score}</span></li>`).join('');
+    if(d.me&&d.me.rank>d.top.length) html+=`<li class="me"><span class="rk">${d.me.rank}</span><span class="nm">${esc(save.name||'Bạn')}</span><span class="sc">${d.me.score}</span></li>`;
+    el.innerHTML=html;
+  }).catch(()=>{
+    const el=$('#lbList'); if(!el) return;
+    el.innerHTML='<li class="lbmsg" style="display:block">Chưa kết nối được bảng xếp hạng chung. Bảng này chạy trên bản web xingxing-two.vercel.app. Kiểm tra mạng rồi thử lại nhé.</li>';
+  });
 }
 function endGame(win){
   if(G.over) return; G.over=true; G.paused=true;
   for(const c of G.chks) c.el.remove(); G.chks=[];
   const L=G.level, stars=win?(G.hp>=100?3:G.hp>=50?2:1):0;
-  if(win){ const b=save.best[L.id]||{stars:0,score:0}; save.best[L.id]={stars:Math.max(b.stars,stars),score:Math.max(b.score,G.score)}; persist(); SFX.win(); } else SFX.lose();
+  if(win){ const b=save.best[L.id]||{stars:0,score:0}; save.best[L.id]={stars:Math.max(b.stars,stars),score:Math.max(b.score,G.score)}; SFX.win(); } else SFX.lose();
+  const gain=G.gemsEarned+(win?stars:0); save.gems+=gain; persist(); hud();
+  const entry={level:L.id,mode:save.set.mode,score:G.score};
   const seen=new Map(); for(const e of G.log){ const k=e.w.id; if(!seen.has(k)) seen.set(k,e); else if(!e.ok) seen.get(k).ok=false; }
   const rows=[...seen.values()].sort((a,b)=>a.ok-b.ok);
   const right=rows.filter(r=>r.ok).length;
@@ -782,17 +912,38 @@ function endGame(win){
   setTimeout(()=>{
     showOverlay(`<div class="card pop-in" style="text-align:center">
       <h2>${win?'Thành trì vững vàng!':'Tường thành đã sụp!'}</h2>
+      <div class="hint" style="margin-top:2px;font-weight:700">${esc(lvName(L))} · Chế độ ${G.mode.name}</div>
       ${win?`<div class="stars">${[0,1,2].map(i=>STAR(i<stars)).join('')}</div>`:'<div class="hint" style="margin:6px 0 8px">Chơi lại sẽ ra bộ từ mới cùng cấp độ.</div>'}
       <div class="stat"><span>Điểm ★ ${G.score}</span><span>Đúng ${right}/${rows.length}</span></div>
+      <div class="gembar">+${gain} ${GEM} Gem <span style="opacity:.6;font-weight:600">(đang có ${save.gems})</span></div>
+      <div id="subBox"></div>
       ${rows.length?`<ul class="wl" style="text-align:left">${li}</ul>`:''}
-      <div class="btns">${hasNext?`<button class="btn blue" id="eNext">Màn tiếp: ${next.name}</button>`:''}<button class="btn" id="eAgain">Chơi lại</button><button class="btn alt" id="eMenu">Menu</button></div>
+      <div class="btns col">${hasNext?`<button class="btn blue" id="eNext">Màn tiếp: ${next.name}</button>`:''}<button class="btn" id="eAgain">Chơi lại ${esc(lvName(L))} · ${G.mode.name}</button><button class="btn alt" id="eMenu">Menu</button></div>
     </div>`, true);
     ovl.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>speak(b.dataset.say,L.lang));
     $('#eAgain').onclick=startGame; $('#eMenu').onclick=menu;
     if(hasNext) $('#eNext').onclick=()=>{save.set.lv=next.id; persist(); startGame()};
+    $('#timeBtn').hidden=true;
+    const box=$('#subBox');
+    const send=()=>{
+      box.innerHTML='<div class="subline">Đang gửi điểm lên bảng xếp hạng...</div>';
+      submitScore(entry).then(d=>{
+        box.innerHTML=`<div class="subline">Bạn đứng hạng <b>#${d.rankAll}</b> tổng điểm và hạng <b>#${d.rankLevel}</b> ở ${esc(L.name)}. <a href="#" id="seeBoard">Xem bảng</a></div>`;
+        $('#seeBoard').onclick=e=>{e.preventDefault(); showBoard(L.id,menu)};
+      }).catch(()=>{
+        save.pending.push(entry); persist();
+        box.innerHTML='<div class="subline">Chưa gửi được điểm, game sẽ tự gửi lại lần sau.</div>';
+      });
+    };
+    if(G.score<=0){ box.innerHTML=''; }
+    else if(save.name) send();
+    else {
+      box.innerHTML=`<div class="subline">Nhập tên tài khoản để lưu điểm (các màn sau sẽ tự lưu):</div><form class="namein" id="subForm"><input id="subName" maxlength="16" placeholder="Tên của bạn" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">Lưu điểm</button></form>`;
+      $('#subForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#subName').value); if(!v) return; save.name=v; persist(); send();};
+    }
   }, win?300:900);
 }
 
-menu();
+if(save.name) menu(); else askName(menu);
 </script>
 </html>
