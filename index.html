@@ -1,5 +1,4 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Xingxing</title>
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="referrer" content="no-referrer"><title>Xingxing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Noto+Sans:wght@600;700&family=Noto+Sans+SC:wght@500;700&display=swap" rel="stylesheet">
@@ -420,15 +419,43 @@ function toneVariants(p,n){
   return [...out];
 }
 const SPK='<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.5h3l4-3.5v12l-4-3.5H3z" fill="#2a2320"/><path d="M13 7a4 4 0 0 1 0 6M15.2 4.8a7 7 0 0 1 0 10.4" fill="none" stroke="#2a2320" stroke-width="2" stroke-linecap="round"/></svg>';
-function speak(text,lang){
+/* Speech: use a device voice when one exists for the language; many phones have no
+   Chinese voice (speechSynthesis then stays silent), so fall back to an online TTS clip. */
+let VOICES=[];
+function loadVoices(){ try{ VOICES=speechSynthesis.getVoices()||[]; }catch(e){} }
+if('speechSynthesis' in window){ loadVoices(); try{ speechSynthesis.addEventListener('voiceschanged',loadVoices); }catch(e){} }
+function findVoice(lang){
+  if(!VOICES.length) loadVoices();
+  const norm=v=>(v.lang||'').replace('_','-').toLowerCase();
+  if(lang==='zh') return VOICES.find(v=>norm(v)==='zh-cn')||VOICES.find(v=>/^(zh|cmn)/.test(norm(v))&&!/hk|yue/.test(norm(v)))||null;
+  return VOICES.find(v=>norm(v)==='en-us')||VOICES.find(v=>norm(v).startsWith('en'))||null;
+}
+let ttsAudio=null;
+function speakOnline(text,lang,onFail){
   try{
-    if(!('speechSynthesis' in window)) return;
+    if(ttsAudio){ ttsAudio.pause(); ttsAudio=null; }
+    const a=new Audio('https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl='+(lang==='zh'?'zh-CN':'en')+'&q='+encodeURIComponent(text));
+    ttsAudio=a; let failed=false; const fail=()=>{ if(failed) return; failed=true; onFail&&onFail(); };
+    a.onerror=fail; const pr=a.play(); if(pr&&pr.catch) pr.catch(fail);
+  }catch(e){ onFail&&onFail(); }
+}
+function speakDevice(text,lang,voice,onFail){
+  try{
+    if(!('speechSynthesis' in window)){ onFail&&onFail(); return; }
     speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(text); u.lang=lang==='zh'?'zh-CN':'en-US'; u.rate=lang==='zh'?.8:.9;
-    const v=speechSynthesis.getVoices().find(v=>v.lang&&v.lang.replace('_','-').toLowerCase().startsWith(lang==='zh'?'zh-cn':'en'));
-    if(v) u.voice=v;
-    speechSynthesis.speak(u);
-  }catch(e){}
+    const u=new SpeechSynthesisUtterance(text); u.lang=lang==='zh'?'zh-CN':'en-US'; u.rate=lang==='zh'?.8:.9; u.volume=1;
+    if(voice) u.voice=voice;
+    let started=false; u.onstart=()=>{started=true};
+    u.onerror=()=>{ if(!started&&onFail){ const f=onFail; onFail=null; f(); } };
+    // Chrome sometimes drops a speak() issued right after cancel(); and if nothing starts, use the fallback.
+    setTimeout(()=>{ try{ speechSynthesis.resume(); speechSynthesis.speak(u); }catch(e){ onFail&&onFail(); } },60);
+    setTimeout(()=>{ if(!started&&onFail){ const f=onFail; onFail=null; try{speechSynthesis.cancel()}catch(e){} f(); } },1500);
+  }catch(e){ onFail&&onFail(); }
+}
+function speak(text,lang){
+  const v=('speechSynthesis' in window)?findVoice(lang):null;
+  if(v) speakDevice(text,lang,v,()=>speakOnline(text,lang));
+  else speakOnline(text,lang,()=>speakDevice(text,lang,null));
 }
 
 /* ================= SOUND ================= */
@@ -763,6 +790,11 @@ function revealLine(w){
     ? `<span class="big">${esc(w.h)}</span> &nbsp;<b class="py-t" style="color:var(--royal)">${esc(w.py)}</b> &nbsp;=&nbsp; ${esc(w.m)}`
     : `<span class="big" style="font-family:var(--display)">${esc(w.en)}</span> &nbsp;=&nbsp; ${esc(w.m)}`;
 }
+/* A tap on a chicken opens the card under the finger; the browser's follow-up click
+   would then hit whatever option sits there. Only accept clicks from a press that
+   started after the card opened (or from the keyboard, detail 0). */
+function tapOk(e){ return !e||e.detail===0||!!(G&&G.modal&&G.modal.armed); }
+ovl.addEventListener('pointerdown',()=>{ if(G&&G.modal) G.modal.armed=true; },true);
 function openQuestion(c){
   G.paused=true; stage.classList.add('paused'); c.state='ask'; c.el.classList.add('target');
   G.qn++;
@@ -785,14 +817,14 @@ function openQuestion(c){
     ${body}
     <div id="fb"></div>
   </div>`, !!q.input);
-  $('#sayBtn').onclick=()=>{ speak(sayTxt,q.lang); if(!G.modal||G.modal.done) return; G.modal.listened=true; $('#sayBtn').classList.add('used'); };
-  $('#hintBtn').onclick=()=>{useHint(); fitCard();};
+  $('#sayBtn').onclick=e=>{ if(!tapOk(e)) return; speak(sayTxt,q.lang); if(!G.modal||G.modal.done) return; G.modal.listened=true; $('#sayBtn').classList.add('used'); };
+  $('#hintBtn').onclick=e=>{ if(!tapOk(e)) return; useHint(); fitCard();};
   if(q.input){
     const inp=$('#tin');
     setTimeout(()=>{try{inp.focus({preventScroll:true})}catch(e){}},60);
     $('#tform').onsubmit=e=>{e.preventDefault(); if(!inp.value.trim()) return; checkTyped(inp.value)};
   } else {
-    ovl.querySelectorAll('.opt').forEach(b=>b.onclick=()=>checkChoice(b));
+    ovl.querySelectorAll('.opt').forEach(b=>b.onclick=e=>{ if(tapOk(e)) checkChoice(b); });
   }
 }
 function useHint(){
