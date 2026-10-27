@@ -105,34 +105,34 @@ button{font-family:inherit;color:inherit}
 .ibtn svg{width:16px;height:16px}
 
 /* ---------- overlays & cards ---------- */
-.overlay{position:absolute;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
+.overlay{position:absolute;inset:0;z-index:9000;overflow:hidden;display:flex;align-items:center;justify-content:center;
   padding:calc(12px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));
-  background:rgba(20,40,80,.35);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  background:rgba(20,40,80,.35)}
 .overlay.top{align-items:flex-start}
 .card{position:relative;width:100%;max-width:560px;background:var(--paper);border:4px solid var(--ink);border-radius:24px;box-shadow:0 7px 0 var(--ink);padding:18px;margin:auto}
 .card h2{margin:0;font-size:24px;line-height:1.1;text-wrap:balance}
 .pop-in{animation:cardIn .25s cubic-bezier(.2,1.4,.5,1)}
-@keyframes cardIn{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+@keyframes cardIn{from{scale:.85;opacity:0}to{scale:1;opacity:1}}
 
 /* menu */
-.logo{position:relative;margin:4px auto 14px;width:max-content;max-width:100%;background:var(--royal);border:4px solid var(--ink);border-radius:6px;padding:6px 26px 2px;box-shadow:0 6px 0 var(--ink);text-align:center}
+.logo{position:relative;margin:14px auto 12px;width:max-content;max-width:100%;background:var(--royal);border:4px solid var(--ink);border-radius:6px;padding:6px 26px 2px;box-shadow:0 6px 0 var(--ink);text-align:center}
 .logo::before{content:"";position:absolute;left:-4px;right:-4px;top:-18px;height:18px;
   background:linear-gradient(90deg,var(--royal) 0 70%,transparent 70%) 0 0/34px 100% repeat-x;
   -webkit-mask:linear-gradient(#000,#000);}
-.logo .t{display:block;font-weight:800;font-style:italic;font-size:clamp(34px,9vw,60px);line-height:1;color:#fff;letter-spacing:.02em;-webkit-text-stroke:7px var(--ink);paint-order:stroke fill;text-shadow:0 4px 0 var(--ink)}
+.logo .t{display:block;font-weight:800;font-style:italic;font-size:clamp(32px,8vw,52px);line-height:1;color:#fff;letter-spacing:.02em;-webkit-text-stroke:7px var(--ink);paint-order:stroke fill;text-shadow:0 4px 0 var(--ink)}
 .logo .s{display:block;font-weight:800;font-size:13px;letter-spacing:.2em;color:var(--gold);margin-top:2px}
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .tab{border:3px solid var(--ink);border-radius:14px;background:#fff;padding:8px;font-weight:800;font-size:17px;cursor:pointer;box-shadow:0 3px 0 var(--ink)}
 .tab[aria-pressed="true"]{background:var(--royal2);color:#fff}
 .levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.lv{position:relative;border:3px solid var(--ink);border-radius:16px;background:var(--cream);padding:8px 6px 6px;cursor:pointer;text-align:center;box-shadow:0 4px 0 var(--ink);min-height:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+.lv{position:relative;border:3px solid var(--ink);border-radius:16px;background:var(--cream);padding:6px 4px 4px;cursor:pointer;text-align:center;box-shadow:0 4px 0 var(--ink);min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
 .lv:active,.tab:active,.btn:active,.opt:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
 .lv[aria-pressed="true"]{background:var(--gold)}
 .lv .n{font-weight:800;font-size:19px;line-height:1.1}
 .lv .d{font-size:12px;font-weight:600;opacity:.75;line-height:1.2}
 .lv .st{font-size:13px;letter-spacing:1px;color:#d08b00;line-height:1;margin-top:3px;min-height:13px}
 .lv .st .off{color:rgba(42,35,32,.2)}
-.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
 .lab{font-weight:700;font-size:14px;letter-spacing:.04em;margin-right:2px}
 .seg{display:flex;border:3px solid var(--ink);border-radius:12px;overflow:hidden;background:#fff}
 .seg button{border:none;background:none;padding:6px 12px;font-weight:700;font-size:15px;cursor:pointer;border-right:2px solid var(--ink)}
@@ -150,6 +150,7 @@ button{font-family:inherit;color:inherit}
 .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .btns .btn{flex:1 1 140px}
 .btns.col{flex-direction:column}.btns.col .btn{flex:none}
+.btns .btn{padding:8px 12px;font-size:18px}
 :focus-visible{outline:3px solid var(--royal2);outline-offset:2px}
 
 /* question card */
@@ -161,6 +162,9 @@ button{font-family:inherit;color:inherit}
 .word .w.vi{font-size:clamp(24px,6vw,36px)}
 .say{flex:none;width:40px;height:40px;border-radius:50%;border:3px solid var(--ink);background:var(--gold);cursor:pointer;display:grid;place-items:center;box-shadow:0 3px 0 var(--ink);padding:0}
 .say svg{width:20px;height:20px}
+.say.listen{position:relative}
+.say .pen{position:absolute;right:-10px;top:-8px;background:var(--bad);color:#fff;border:2px solid var(--ink);border-radius:999px;font-size:11px;font-weight:800;padding:0 4px;line-height:1.4}
+.say.used{background:#e9e2cf}
 .prompt{text-align:center;font-weight:700;font-size:18px;margin-bottom:12px}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .opts.one{grid-template-columns:1fr}
@@ -182,10 +186,10 @@ button{font-family:inherit;color:inherit}
 
 /* results */
 .stars{display:flex;justify-content:center;gap:6px;margin:8px 0}
-.stars svg{width:46px;height:46px}
+.stars svg{width:38px;height:38px}
 .stat{display:flex;justify-content:center;gap:18px;font-weight:700;font-size:16px;margin-bottom:6px;font-variant-numeric:tabular-nums}
-.wl{list-style:none;margin:10px 0 0;padding:0;max-height:min(38vh,320px);overflow-y:auto;border:3px solid var(--ink);border-radius:14px;background:#fff}
-.wl li{display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:2px dashed rgba(42,35,32,.15);font-size:15px}
+.wl{list-style:none;margin:10px 0 0;padding:0;max-height:min(30vh,300px);overflow-y:auto;border:3px solid var(--ink);border-radius:14px;background:#fff}
+.wl li{display:flex;align-items:center;gap:10px;padding:4px 10px;border-bottom:2px dashed rgba(42,35,32,.15);font-size:15px}
 .wl li:last-child{border-bottom:none}
 .wl .h{font-family:var(--han);font-weight:700;font-size:20px;min-width:0}
 .wl .en{font-weight:800;font-size:17px}
@@ -230,7 +234,23 @@ button{font-family:inherit;color:inherit}
 .demo .bob{animation:bob .17s infinite alternate ease-in-out}
 .demo.march{animation:march linear infinite}
 @keyframes march{0%{transform:translateX(-30vw);opacity:1}88%{opacity:1}100%{transform:translateX(var(--to,60vw));opacity:0}}
+.verdict .vrow{display:flex;align-items:center;justify-content:center;gap:10px}
+.verdict .vchk{width:min(34vw,140px);flex:none;animation:hop .5s ease-in-out infinite alternate}
+.verdict.dumb .vchk{animation:wobble .25s ease-in-out infinite alternate}
+@keyframes hop{from{transform:translateY(0)}to{transform:translateY(-10px)}}
+@keyframes wobble{from{transform:rotate(-8deg)}to{transform:rotate(8deg)}}
+.verdict .bubble{position:relative;background:#fff;border:4px solid var(--ink);border-radius:22px;padding:10px 14px;box-shadow:0 4px 0 var(--ink);min-width:0}
+.verdict .bubble::before{content:"";position:absolute;left:-14px;top:40%;border:10px solid transparent;border-right:14px solid var(--ink)}
+.verdict .say1{font-weight:800;font-size:clamp(22px,6vw,32px);line-height:1.1;text-wrap:balance}
+.verdict.good .say1{color:var(--ok)}
+.verdict.dumb .say1{color:var(--bad)}
+.verdict .ico{font-size:34px;line-height:1.2}
 .verline{text-align:center;font-size:12px;font-weight:600;opacity:.55;margin-top:8px}
+@media (max-height:520px) and (min-width:700px){
+  .card{max-width:780px}
+  .levels{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .logo{margin:10px auto 8px}
+}
 @media (prefers-reduced-motion:reduce){
   .splash .start,.splash .logo,.demo.march{animation:none}
   .cloud{animation:none}
@@ -259,8 +279,8 @@ button{font-family:inherit;color:inherit}
 .lbtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:10px 0 6px;-webkit-overflow-scrolling:touch}
 .lbtabs button{flex:none;border:2.5px solid var(--ink);border-radius:999px;background:#fff;padding:4px 12px;font-weight:700;font-size:14px;cursor:pointer}
 .lbtabs button[aria-pressed="true"]{background:var(--royal2);color:#fff}
-.lb{list-style:none;margin:0;padding:0;border:3px solid var(--ink);border-radius:14px;background:#fff;max-height:min(52vh,420px);overflow-y:auto}
-.lb li{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:2px dashed rgba(42,35,32,.15);font-weight:700;font-size:16px}
+.lb{list-style:none;margin:0;padding:0;border:3px solid var(--ink);border-radius:14px;background:#fff;max-height:min(48vh,420px);overflow-y:auto}
+.lb li{display:flex;align-items:center;gap:10px;padding:5px 12px;border-bottom:2px dashed rgba(42,35,32,.15);font-weight:700;font-size:16px}
 .lb li:last-child{border-bottom:none}
 .lb li.me{background:#fff3c4}
 .lb .rk{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:2.5px solid var(--ink);background:var(--cream);font-size:14px;font-variant-numeric:tabular-nums}
@@ -351,7 +371,8 @@ const MODES = {
   hard:{name:'Khó',per:3,dur:12,total:18,gap:2.6},
 };
 const DMG = 25;
-const VERSION = 5;
+const LISTEN_COST = 5;
+const VERSION = 6;
 
 /* ================= STORAGE ================= */
 const SKEY='bangavocab_v1';
@@ -711,8 +732,7 @@ function openQuestion(c){
   G.qn++;
   const q=buildQuestion(c); G.modal={c,q,done:false,t0:performance.now()};
   const sayTxt=q.lang==='zh'?q.w.h:q.w.en;
-  const canSay = q.showCls!=='vi';
-  let body;
+    let body;
   if(q.input){
     body=`<form class="typein" id="tform" autocomplete="off"><input id="tin" class="${q.lang==='zh'?'py-t':''}" type="text" inputmode="${q.lang==='zh'?'latin':'text'}" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${esc(q.ph)}" aria-label="Câu trả lời"><button class="btn blue" type="submit">Bắn!</button></form>`;
     if(q.lang==='zh') body+=`<div class="hint">Gõ không dấu là đúng. Gõ đúng cả thanh điệu (vd: ni3 hao3 hoặc nǐ hǎo) được thưởng thêm điểm.</div>`;
@@ -722,15 +742,15 @@ function openQuestion(c){
   }
   showOverlay(`<div class="card pop-in" role="dialog" aria-label="Câu hỏi">
     <div class="qhead"><span class="pill">Gà số ${G.resolved+1}/${G.mode.total}</span><span>${G.level.name}</span></div>
-    <div class="word"><div class="w ${q.showCls}">${esc(q.show)}</div>${canSay?`<button class="say" id="sayBtn" aria-label="Nghe phát âm">${SPK}</button>`:''}</div>
+    <div class="word"><div class="w ${q.showCls}">${esc(q.show)}</div><button class="say listen" id="sayBtn" aria-label="Nghe phát âm, trừ ${LISTEN_COST} điểm">${SPK}<span class="pen">-${LISTEN_COST}</span></button></div>
     <div class="prompt">${esc(q.prompt)}</div>
     <div class="qtools"><button class="tool" id="hintBtn" ${save.gems<COST.hint?'disabled':''}>Gợi ý <span class="cost">${GEM}${COST.hint}</span></button></div>
     <div id="hintLine"></div>
     ${body}
     <div id="fb"></div>
   </div>`, !!q.input);
-  if(canSay) $('#sayBtn').onclick=()=>speak(sayTxt,q.lang);
-  $('#hintBtn').onclick=()=>useHint();
+  $('#sayBtn').onclick=()=>{ speak(sayTxt,q.lang); if(!G.modal||G.modal.done) return; G.modal.listened=true; $('#sayBtn').classList.add('used'); };
+  $('#hintBtn').onclick=()=>{useHint(); fitCard();};
   if(q.input){
     const inp=$('#tin');
     setTimeout(()=>{try{inp.focus({preventScroll:true})}catch(e){}},60);
@@ -779,16 +799,17 @@ function answered(ok,exact){
   if(ok){
     G.combo++;
     let pts=10+(quick?5:0)+(exact?5:0)+Math.min(10,(G.combo-1)*2);
+    if(M.listened) pts=Math.max(5,pts-LISTEN_COST);
     G.score+=pts; G.log.push({w,ok:true}); c.logged=true; G.gemsEarned++;
     SFX.ok(); speak(G.level.lang==='zh'?w.h:w.en,G.level.lang);
-    const extra=[exact?'Chuẩn cả thanh điệu! +5':'',quick?'Nhanh tay! +5':'',G.combo>1?`Liên hoàn x${G.combo}`:''].filter(Boolean).join(' · ');
-    fb.innerHTML=`<div class="fb ok"><b>Đúng rồi! +${pts}</b>${extra?' <span style="opacity:.8">('+extra+')</span>':''}<br>${revealLine(w)}</div>`;
+    const extra=[M.listened?`Có nghe −${LISTEN_COST}`:'',exact?'Chuẩn cả thanh điệu! +5':'',quick?'Nhanh tay! +5':'',G.combo>1?`Liên hoàn x${G.combo}`:''].filter(Boolean).join(' · ');
+    fb.innerHTML=`<div class="fb ok"><b>Đúng rồi! +${pts}</b>${extra?' <span style="opacity:.8">('+extra+')</span>':''}<br>${revealLine(w)}</div>`; fitCard();
     setTimeout(()=>{ closeQuestion(); c.state='shot';
       fireAt(c,()=>{ SFX.pop(); boom(c.x,c.y-c.s*0.5); feathers(c.x,c.y-c.s*0.5,12); floatText(c.x,c.y-c.s,'+'+pts); removeChicken(c); resolveOne(); });
     },1300);
   } else {
     G.combo=0; G.log.push({w,ok:false}); c.logged=true; SFX.bad();
-    fb.innerHTML=`<div class="fb no"><b>Sai rồi!</b> Đáp án đúng:<br>${revealLine(w)}<button class="btn" id="contBtn">Tiếp tục ▶</button></div>`;
+    fb.innerHTML=`<div class="fb no"><b>Sai rồi!</b> Đáp án đúng:<br>${revealLine(w)}<button class="btn" id="contBtn">Tiếp tục ▶</button></div>`; fitCard();
     $('#contBtn').onclick=()=>{ closeQuestion(); c.state='charge'; c.el.classList.add('charge'); c.x0=c.x; c.start=G.t; c.dur=Math.max(0.35,(targetX(c)-c.x)/ (W*0.9)); c.qEl.textContent='!'; c.el.classList.add('warn'); c.bar.style.transform='scaleX(0)'; };
     setTimeout(()=>{try{$('#contBtn')?.focus()}catch(e){}},50);
     speak(G.level.lang==='zh'?w.h:w.en,G.level.lang);
@@ -804,7 +825,15 @@ addEventListener('keydown',e=>{
 });
 
 /* ================= OVERLAYS ================= */
-function showOverlay(html,top,cls=''){ovl.innerHTML=`<div class="overlay ${top?'top':''} ${cls}">${html}</div>`}
+function showOverlay(html,top,cls=''){ovl.innerHTML=`<div class="overlay ${top?'top':''} ${cls}">${html}</div>`; fitCard();}
+function fitCard(){
+  const o=ovl.firstElementChild, c=o&&o.querySelector(':scope > .card'); if(!c) return;
+  const cs=getComputedStyle(o), avail=o.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom)-8;
+  const h=c.offsetHeight+7;
+  if(h>avail){ const k=Math.max(0.5,avail/h); c.style.transform=`scale(${k.toFixed(3)})`; c.style.transformOrigin='top center'; c.style.marginTop='0'; c.style.marginBottom=`${-(h*(1-k)).toFixed(0)}px`; o.style.alignItems='flex-start'; }
+  else { c.style.transform=''; c.style.marginTop=''; c.style.marginBottom=''; o.style.alignItems=''; }
+}
+addEventListener('resize',()=>fitCard());
 function closeOverlay(){ovl.innerHTML=''}
 function togglePause(){
   if(!G||G.over||G.modal) return;
@@ -848,15 +877,14 @@ function menu(){
       <button class="chip" id="optSound" aria-pressed="${s.sound}"><span class="box"></span>Âm thanh</button>
     </div>
     <div class="hint" id="modeHint"></div>
-    <div class="row" style="justify-content:space-between">
-      <button class="chip" id="nameBtn"><span class="who">Tài khoản: <b>${esc(save.name||'bấm để nhập tên')}</b>${save.name?' <span style="opacity:.6;font-weight:600">· đổi tên</span>':''}</span></button>
-      <span class="chip" style="cursor:default">${GEM} ${save.gems} Gem</span>
+    <div class="row" style="justify-content:space-between;margin-top:8px;flex-wrap:nowrap">
+      <button class="chip" id="nameBtn" style="min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"><span class="who" style="min-width:0;overflow:hidden;text-overflow:ellipsis">Tài khoản: <b>${esc(save.name||'bấm để nhập tên')}</b>${save.name?' <span style="opacity:.6;font-weight:600">· đổi tên</span>':''}</span></button>
+      <span class="chip" style="cursor:default;flex:none">${GEM} ${save.gems}</span>
     </div>
-    <button class="btn big" id="playBtn">Bảo vệ thành!</button>
-    <button class="btn blue" id="boardBtn" style="width:100%;margin-top:8px;font-size:18px;padding:8px">Bảng xếp hạng</button>
+    <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn" id="playBtn" style="flex:2 1 0;font-size:22px">Bảo vệ thành!</button><button class="btn blue" id="boardBtn" style="flex:1 1 0;font-size:17px;padding:8px 6px">Xếp hạng</button></div>
     <div class="verline">Xingxing · Phiên bản ${VERSION}</div>
   </div>`);
-  const mh=()=>{const m=MODES[save.set.mode]; $('#modeHint').textContent=`${m.per===1?'Mỗi lượt 1 con gà':'Tối đa '+m.per+' con gà cùng lúc'}, ${m.dur} giây để chạy tới tường. Chạm vào gà để trả lời, đúng thì đại bác bắn hạ. Tường thành chịu được 3 lần húc, lần thứ 4 là thua. Cần trụ qua ${m.total} con gà.`};
+  const mh=()=>{const m=MODES[save.set.mode]; $('#modeHint').textContent=`${m.per===1?'1 gà mỗi lượt':'Tối đa '+m.per+' gà cùng lúc'} · ${m.dur} giây tới tường · ${m.total} gà · tường chịu 3 lần húc`};
   mh();
   ovl.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{save.set.lang=b.dataset.lang; save.set.lv=LEVELS.find(l=>l.lang===save.set.lang).id; persist(); menu()});
   ovl.querySelectorAll('.lv').forEach(b=>b.onclick=()=>{save.set.lv=b.dataset.lv; persist(); ovl.querySelectorAll('.lv').forEach(x=>x.setAttribute('aria-pressed',x===b))});
@@ -926,14 +954,14 @@ function showBoard(board,back){
     if(!d.top||!d.top.length){ el.innerHTML='<li class="lbmsg" style="display:block">Chưa có ai trên bảng này. Chơi một màn để giành hạng 1!</li>'; return; }
     let html=d.top.map((r,i)=>`<li class="${r.id===save.pid?'me':''}"><span class="rk">${i+1}</span><span class="nm">${esc(r.name||'Ẩn danh')}</span><span class="sc">${r.score}</span></li>`).join('');
     if(d.me&&d.me.rank>d.top.length) html+=`<li class="me"><span class="rk">${d.me.rank}</span><span class="nm">${esc(save.name||'Bạn')}</span><span class="sc">${d.me.score}</span></li>`;
-    el.innerHTML=html;
+    el.innerHTML=html; fitCard();
   }).catch(()=>{
     const el=$('#lbList'); if(!el) return;
     el.innerHTML='<li class="lbmsg" style="display:block">Chưa kết nối được bảng xếp hạng chung. Bảng này chạy trên bản web xingxing-two.vercel.app. Kiểm tra mạng rồi thử lại nhé.</li>';
   });
 }
 function endGame(win){
-  if(G.over) return; G.over=true; G.paused=true;
+  if(G.over) return; G.over=true; G.paused=true; $('#timeBtn').hidden=true;
   for(const c of G.chks) c.el.remove(); G.chks=[];
   const L=G.level, stars=win?(G.hp>=100?3:G.hp>=50?2:1):0;
   if(win){ const b=save.best[L.id]||{stars:0,score:0}; save.best[L.id]={stars:Math.max(b.stars,stars),score:Math.max(b.score,G.score)}; SFX.win(); } else SFX.lose();
@@ -945,7 +973,7 @@ function endGame(win){
   const li=rows.map(({w,ok})=>`<li><span class="mk ${ok?'ok':'no'}">${ok?'✓':'✗'}</span>${L.lang==='zh'?`<span class="h">${esc(w.h)}</span><span class="p">${esc(w.py)}</span>`:`<span class="en">${esc(w.en)}</span>`}<span class="m">${esc(w.m)}</span><button class="say" data-say="${esc(L.lang==='zh'?w.h:w.en)}" aria-label="Nghe">${SPK}</button></li>`).join('');
   const next=LEVELS[LEVELS.indexOf(L)+1];
   const hasNext=win&&next&&next.lang===L.lang;
-  setTimeout(()=>{
+  const showResult=()=>{
     showOverlay(`<div class="card pop-in" style="text-align:center">
       <h2>${win?'Thành trì vững vàng!':'Tường thành đã sụp!'}</h2>
       <div class="hint" style="margin-top:2px;font-weight:700">${esc(lvName(L))} · Chế độ ${G.mode.name}</div>
@@ -954,7 +982,8 @@ function endGame(win){
       <div class="gembar">+${gain} ${GEM} Gem <span style="opacity:.6;font-weight:600">(đang có ${save.gems})</span></div>
       <div id="subBox"></div>
       ${rows.length?`<ul class="wl" style="text-align:left">${li}</ul>`:''}
-      <div class="btns col">${hasNext?`<button class="btn blue" id="eNext">Màn tiếp: ${next.name}</button>`:''}<button class="btn" id="eAgain">Chơi lại ${esc(lvName(L))} · ${G.mode.name}</button><button class="btn alt" id="eMenu">Menu</button></div>
+      <div class="btns col"><button class="btn" id="eAgain">Chơi lại ${esc(lvName(L))} · ${G.mode.name}</button></div>
+      <div class="btns" style="margin-top:8px;flex-wrap:nowrap">${hasNext?`<button class="btn blue" id="eNext" style="flex:2 1 0">Màn tiếp: ${next.name}</button>`:''}<button class="btn alt" id="eMenu" style="flex:1 1 0">Menu</button></div>
     </div>`, true);
     ovl.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>speak(b.dataset.say,L.lang));
     $('#eAgain').onclick=startGame; $('#eMenu').onclick=menu;
@@ -966,18 +995,39 @@ function endGame(win){
       submitScore(entry).then(d=>{
         box.innerHTML=`<div class="subline">Bạn đứng hạng <b>#${d.rankAll}</b> tổng điểm và hạng <b>#${d.rankLevel}</b> ở ${esc(L.name)}. <a href="#" id="seeBoard">Xem bảng</a></div>`;
         $('#seeBoard').onclick=e=>{e.preventDefault(); showBoard(L.id,menu)};
+        fitCard();
       }).catch(()=>{
         save.pending.push(entry); persist();
-        box.innerHTML='<div class="subline">Chưa gửi được điểm, game sẽ tự gửi lại lần sau.</div>';
+        box.innerHTML='<div class="subline">Chưa gửi được điểm, game sẽ tự gửi lại lần sau.</div>'; fitCard();
       });
     };
     if(G.score<=0){ box.innerHTML=''; }
     else if(save.name) send();
     else {
       box.innerHTML=`<div class="subline">Nhập tên tài khoản để lưu điểm (các màn sau sẽ tự lưu):</div><form class="namein" id="subForm"><input id="subName" maxlength="20" placeholder="Tên của bạn" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">Lưu điểm</button></form>`;
+      fitCard();
       $('#subForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#subName').value); if(!v) return; save.name=v; persist(); send();};
     }
-  }, win?300:900);
+  };
+  setTimeout(()=>verdict(win,rows.length-right,rows.length,showResult), win?300:900);
+}
+function verdict(win,wrong,total,next){
+  const dumb=total>0 && wrong/total>0.5;
+  const kind=dumb?'dumb':win?'good':'meh';
+  const T={
+    good:{say:'Cục tác, giỏi!',icon:'👏',sub:`Bạn đã giữ vững thành, đúng ${total-wrong}/${total} câu.`,look:{body:'#ffd84a',wing:'#f5bf1c',hat:'none',weapon:'sword',chick:true}},
+    dumb:{say:'Đồ học dốt!',icon:'🤪😝',sub:`Sai ${wrong}/${total} câu. Gà cười vào mặt bạn đấy!`,look:{body:'#fff6e3',wing:'#f1dfbb',hat:'viking',weapon:'axe'}},
+    meh:{say:'Cục tác... suýt nữa rồi!',icon:'💪',sub:`Đúng ${total-wrong}/${total} câu. Ôn lại rồi thử lần nữa nhé.`,look:{body:'#d79b5d',wing:'#bf8045',hat:'helmet',weapon:'shovel'}},
+  }[kind];
+  showOverlay(`<div class="card pop-in verdict ${kind}" style="max-width:440px;text-align:center">
+    <div class="vrow"><div class="vchk">${chickenSVG(T.look)}</div>
+      <div class="bubble"><div class="say1">${T.say}</div><div class="ico">${T.icon}</div></div></div>
+    <div class="hint" style="font-weight:700;margin-top:6px">${T.sub}</div>
+    <button class="btn blue" id="vNext" style="width:100%;margin-top:12px">Xem kết quả</button></div>`);
+  if(kind==='dumb'){ [0,.18,.36,.54].forEach(d=>tone(900,.08,'square',.05,-400,d)); }
+  else if(kind==='good'){ SFX.cluck(); }
+  let done=false; const go=()=>{ if(done) return; done=true; next(); };
+  $('#vNext').onclick=go; setTimeout(go,4000);
 }
 
 function splash(){
