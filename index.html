@@ -329,6 +329,48 @@ button{font-family:inherit;color:inherit}
 .verdict.good .say1{color:var(--ok)}
 .verdict.dumb .say1{color:var(--bad)}
 .verdict .ico{font-size:34px;line-height:1.2}
+/* main menu */
+.mnu{max-width:460px;padding:14px}
+.mnu .logo{margin:10px auto 10px;padding:4px 20px 1px}
+.mnu .logo .t{font-size:clamp(28px,7vw,40px)}
+.mnu .logo .s{font-size:11px}
+.overlay.mwrap{padding:58px 10px 78px}
+.topbar{position:absolute;left:0;right:0;top:0;padding:8px 10px 0;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+.topbar>*{pointer-events:auto}
+.topbar .acct{width:100%;max-width:460px}
+.honor.slim{border-width:2px;border-radius:999px;padding:2px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;max-width:min(460px,100%);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0}
+.overlay.mwrap:has(.honor.slim:not([hidden])){padding-top:84px}
+.dock{position:absolute;left:0;right:0;bottom:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:6px}
+.dock .tool2{flex:1;max-width:92px;position:relative}
+.tool2 kbd{display:none;position:absolute;top:-7px;right:-5px;background:var(--ink);color:#fff;font:700 10px/1 system-ui,sans-serif;border-radius:5px;padding:3px 4px}
+@media (hover:hover) and (pointer:fine){.tool2 kbd{display:block}}
+@media (min-width:760px){
+  .overlay.mwrap{padding:58px 10px 16px}
+  .dock{left:auto;right:auto;top:50%;bottom:auto;left:calc(50% - 248px - 118px);transform:translateY(-50%);flex-direction:column;padding:0;width:96px}
+  .dock .tool2{max-width:none;padding:8px 2px}
+}
+.acct{display:flex;gap:8px}
+.acct .who{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;justify-content:flex-start;display:block;text-align:left}
+.acct .who .ed{opacity:.5}
+.acct .gem{flex:none;cursor:default}
+.mnu .tabs{margin-bottom:8px}.mnu .tab{padding:6px;font-size:16px}
+.mnu .levels{gap:6px}
+.mnu .levels.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.mnu .lv{min-height:0;padding:6px 2px;border-radius:12px;box-shadow:0 3px 0 var(--ink)}
+.mnu .lv .n{font-size:16px;white-space:nowrap}
+.mnu .lv .mn{font-size:11px;margin-top:1px}
+.opts2{display:flex;gap:6px;margin-top:10px;align-items:stretch}
+.opts2 .seg{flex:1}.opts2 .seg button{flex:1;padding:6px 4px}
+.tgl{border:3px solid var(--ink);border-radius:12px;background:#fff;font-weight:700;font-size:14px;padding:4px 8px;cursor:pointer;white-space:nowrap}
+.tgl[aria-pressed="true"]{background:var(--ok);color:#fff}
+#optSound{font-size:18px;padding:2px 8px}
+.btn.play{width:100%;margin-top:10px;font-size:22px;line-height:1.1;padding:10px 8px}
+.btn.play small{display:block;font-size:12px;opacity:.85;font-weight:700;margin-top:2px}
+.tools{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px}
+.tool2{border:3px solid var(--ink);border-radius:12px;background:#fff;box-shadow:0 3px 0 var(--ink);padding:5px 2px;font-weight:800;font-size:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.15}
+.tool2 i{font-style:normal;font-size:20px;line-height:1.1}
+.tool2:active{transform:translateY(3px);box-shadow:0 0 0 var(--ink)}
+#goldBtn,#examBtn{background:#fff3c4}
 .verline{text-align:center;font-size:12px;font-weight:600;opacity:.55;margin-top:8px}
 @media (max-height:520px) and (min-width:700px){
   .card{max-width:780px}
@@ -456,7 +498,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 26;
+const VERSION = 27;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,hsk7:3,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -1055,6 +1097,14 @@ function fitCard(){
   else { c.style.transform=''; c.style.marginTop=''; c.style.marginBottom=''; o.style.alignItems=''; }
 }
 addEventListener('resize',()=>fitCard());
+// Menu shortcuts: X ranking, T dictionary, D exams, V golden board, H help, N rename, Enter play
+addEventListener('keydown',e=>{
+  const dock=$('#dock'); if(!dock||e.ctrlKey||e.metaKey||e.altKey||/input|textarea/i.test(e.target.tagName)) return;
+  const k=e.key.toLowerCase();
+  if(k==='enter'&&$('#playBtn')){ e.preventDefault(); $('#playBtn').click(); return; }
+  if(k==='n'){ $('#nameBtn')?.click(); return; }
+  const b=dock.querySelector(`[data-key="${k}"]`); if(b){ e.preventDefault(); b.click(); }
+});
 function closeOverlay(){ovl.innerHTML=''}
 function togglePause(){
   if(!G||G.over||G.modal) return;
@@ -1093,40 +1143,47 @@ function menu(){
   flushPending();
   const s=save.set;
   const levels=LEVELS.filter(l=>l.lang===s.lang);
-  showOverlay(`<div class="card pop-in">
+  const K=s.lang==='en'?'TOEIC':'HSK';
+  // Core choices stay in the card; account, honors and the side features sit outside it,
+  // reachable from the dock (and keyboard shortcuts on a computer).
+  showOverlay(`<div class="topbar">
+      <div class="acct">
+        <button class="chip who" id="nameBtn" title="Đổi tên (phím N)">👤 <b>${save.name?nameT(save.name,myTitle()):'Nhập tên'}</b> <span class="ed">✎</span></button>
+        <span class="chip gem">${GEM} ${save.gems}</span>
+      </div>
+      <button class="honor slim" id="honorLine" hidden></button>
+    </div>
+    <div class="card pop-in mnu">
     <div class="logo"><span class="t">XINGXING</span><span class="s">BẮN GÀ · HỌC TỪ VỰNG</span></div>
     <div class="tabs" role="group" aria-label="Ngôn ngữ">
       <button class="tab" data-lang="zh" aria-pressed="${s.lang==='zh'}">Tiếng Trung</button>
       <button class="tab" data-lang="en" aria-pressed="${s.lang==='en'}">Tiếng Anh</button>
     </div>
-    <div class="levels">${levels.map(l=>`<button class="lv" data-lv="${l.id}" aria-pressed="${s.lv===l.id}"><span class="n">${l.name}</span><span class="d">${l.d}</span><span class="st">${starsFor(l)}</span><span class="mn">Màn ${stageOf(l)}/${l.stages}</span></button>`).join('')}</div>
-    <div class="row"><span class="lab">Chế độ</span>
+    <div class="levels c${levels.length>4?4:levels.length}">${levels.map(l=>`<button class="lv" data-lv="${l.id}" aria-pressed="${s.lv===l.id}" title="${esc(l.d)}"><span class="n">${l.lang==='en'?l.name:l.name.replace('HSK ','HSK\u00a0')}</span><span class="mn">Màn ${stageOf(l)}/${l.stages}</span></button>`).join('')}</div>
+    <div class="opts2">
       <div class="seg" role="group" aria-label="Chế độ">${Object.entries(MODES).map(([k,m])=>`<button data-mode="${k}" aria-pressed="${s.mode===k}">${m.name}</button>`).join('')}</div>
+      <button class="tgl" id="optType" aria-pressed="${s.type}" title="Thêm câu hỏi gõ ${s.lang==='zh'?'pinyin':'chính tả'}">⌨️ Gõ ${s.lang==='zh'?'pinyin':'từ'}</button>
+      <button class="tgl" id="optSound" aria-pressed="${s.sound}" title="Âm thanh">${s.sound?'🔊':'🔇'}</button>
     </div>
-    <div class="row">
-      <button class="chip" id="optType" aria-pressed="${s.type}"><span class="box"></span>Câu hỏi gõ ${s.lang==='zh'?'pinyin':'chính tả'}</button>
-      <button class="chip" id="optSound" aria-pressed="${s.sound}"><span class="box"></span>Âm thanh</button>
-    </div>
-    <div class="hint" id="modeHint"></div>
-    <div class="row" style="justify-content:space-between;margin-top:8px;flex-wrap:nowrap">
-      <button class="chip" id="nameBtn" style="min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"><span class="who" style="min-width:0;overflow:hidden;text-overflow:ellipsis">Tài khoản: <b>${save.name?nameT(save.name,myTitle()):'bấm để nhập tên'}</b>${save.name?' <span style="opacity:.6;font-weight:600">· đổi tên</span>':''}</span></button>
-      <span class="chip" style="cursor:default;flex:none">${GEM} ${save.gems}</span>
-    </div>
-    <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn" id="playBtn" style="flex:2 1 0;font-size:21px;line-height:1.05">Bảo vệ thành!<small id="playSt" style="display:block;font-size:13px;opacity:.85"></small></button><div style="flex:1 1 0;display:flex;flex-direction:column;gap:6px;min-width:0"><button class="btn blue" id="boardBtn" style="flex:none;font-size:15px;padding:5px 4px">Xếp hạng</button><button class="btn alt" id="dictBtn" style="flex:none;font-size:15px;padding:5px 4px">${save.dict[save.set.lv]?'':'🔒 '}Từ điển</button></div></div>
-    <div class="btns" style="margin-top:8px;flex-wrap:nowrap"><button class="btn gold" id="examBtn" style="flex:1 1 0;font-size:16px;padding:6px 4px">📝 Đề thi ${s.lang==='en'?'TOEIC':'HSK'}</button><button class="btn gold" id="goldBtn" style="flex:1 1 0;font-size:16px;padding:6px 4px">🏆 Bảng vàng ${s.lang==='en'?'TOEIC':'HSK'}</button></div>
-    <div class="honor" id="honorLine" hidden></div>
-    <div class="verline">Xingxing · Phiên bản ${VERSION} · <a href="#" id="tutLink">Hướng dẫn</a></div>
-  </div>`);
-  const mh=()=>{const m=MODES[save.set.mode]; $('#modeHint').textContent=`${m.per===1?'1 gà mỗi lượt':'Tối đa '+m.per+' gà cùng lúc'} · ${m.dur} giây tới tường · ${m.total} gà · tường chịu 3 lần húc`};
-  mh();
-  const ps=()=>{const L=LEVELS.find(l=>l.id===save.set.lv); $('#playSt').textContent=lvName(L)+' · Màn '+stageOf(L)+'/'+L.stages;}; ps();
+    <button class="btn play" id="playBtn">▶ Bảo vệ thành!<small id="playSt"></small></button>
+    <div class="verline">Phiên bản ${VERSION}</div>
+  </div>
+  <nav class="dock" id="dock" aria-label="Chức năng">
+    <button class="tool2" id="boardBtn" data-key="x"><i>🏅</i>Xếp hạng<kbd>X</kbd></button>
+    <button class="tool2" id="dictBtn" data-key="t"><i>${save.dict[save.set.lv]?'📖':'🔒'}</i>Từ điển<kbd>T</kbd></button>
+    <button class="tool2" id="examBtn" data-key="d"><i>📝</i>Thi ${K}<kbd>D</kbd></button>
+    <button class="tool2" id="goldBtn" data-key="v"><i>🏆</i>Bảng vàng<kbd>V</kbd></button>
+    <button class="tool2" id="tutLink" data-key="h"><i>❓</i>Hướng dẫn<kbd>H</kbd></button>
+  </nav>`,false,'mwrap');
+  const ps=()=>{const L=LEVELS.find(l=>l.id===save.set.lv), m=MODES[save.set.mode]; $('#playSt').textContent=`${lvName(L)} · Màn ${stageOf(L)}/${L.stages} · ${m.name}: ${m.total} gà, ${m.dur}s`;}; ps();
   $('#dictBtn').onclick=()=>openDict(save.set.lv,menu);
   $('#tutLink').onclick=e=>{e.preventDefault(); showTutorial(0,menu);};
+  $('#honorLine').onclick=()=>openGold(save.set.lang,menu);
   ovl.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{save.set.lang=b.dataset.lang; save.set.lv=LEVELS.find(l=>l.lang===save.set.lang).id; persist(); menu()});
-  ovl.querySelectorAll('.lv').forEach(b=>b.onclick=()=>{save.set.lv=b.dataset.lv; persist(); ovl.querySelectorAll('.lv').forEach(x=>x.setAttribute('aria-pressed',x===b)); ps(); $('#dictBtn').textContent=(save.dict[save.set.lv]?'':'🔒 ')+'Từ điển';});
-  ovl.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{save.set.mode=b.dataset.mode; persist(); ovl.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',x===b)); mh()});
+  ovl.querySelectorAll('.lv').forEach(b=>b.onclick=()=>{save.set.lv=b.dataset.lv; persist(); ovl.querySelectorAll('.lv').forEach(x=>x.setAttribute('aria-pressed',x===b)); ps(); $('#dictBtn i').textContent=save.dict[save.set.lv]?'📖':'🔒';});
+  ovl.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{save.set.mode=b.dataset.mode; persist(); ovl.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',x===b)); ps()});
   $('#optType').onclick=e=>{save.set.type=!save.set.type; persist(); e.currentTarget.setAttribute('aria-pressed',save.set.type)};
-  $('#optSound').onclick=e=>{save.set.sound=!save.set.sound; persist(); e.currentTarget.setAttribute('aria-pressed',save.set.sound)};
+  $('#optSound').onclick=e=>{save.set.sound=!save.set.sound; persist(); e.currentTarget.setAttribute('aria-pressed',save.set.sound); e.currentTarget.textContent=save.set.sound?'🔊':'🔇'};
   $('#playBtn').onclick=()=>{ac(); startGame()};
   $('#boardBtn').onclick=()=>showBoard(save.set.lang,menu);
   $('#examBtn').onclick=()=>openExams(save.set.lv,menu);
@@ -1550,7 +1607,8 @@ function loadHonors(){
     HONORS={zh:d.honors,en:d.other};
     const t=myTitle(); save.title=t?{week:d.honors.week,rank:t}:null; persist();
     const el=$('#honorLine'), lang=save.set.lang, h=HONORS[lang];
-    if(el&&h&&h.top.length){ el.innerHTML=`<div class="ht">🏆 Vinh danh ${lang==='en'?'TOEIC':'HSK'} tuần ${weekRange(h.week)}</div><div class="hl">${honorHTML(h)}</div>`; el.hidden=false; fitCard(); }
+    if(el&&h&&h.top.length&&el.classList.contains('slim')){ el.innerHTML=`🏆 Top tuần trước: ${h.top.slice(0,3).map((r,i)=>esc(r.name)+' '+TITLES[i+1][0]).join(' · ')}`; el.hidden=false; fitCard(); }
+    else if(el&&h&&h.top.length){ el.innerHTML=`<div class="ht">🏆 Vinh danh ${lang==='en'?'TOEIC':'HSK'} tuần ${weekRange(h.week)}</div><div class="hl">${honorHTML(h)}</div>`; el.hidden=false; fitCard(); }
     for(const lg of ['zh','en']){ const H=HONORS[lg]; const mine=H&&H.top.find(x=>x.id===save.pid); if(mine&&!save.claimed[lg+H.week]&&!(lg==='zh'&&save.claimed[H.week])) return claimReward(lg); }
   }).catch(()=>{});
 }
