@@ -1,5 +1,5 @@
 // Shared leaderboards for Xingxing, stored in Upstash Redis (Vercel Storage → Upstash for Redis).
-// GET  /api/scores?board=zh|en|hsk1..hsk6|en1..en3&me=<playerId> → { top:[{id,name,score,t}], me:{rank,score}|null }
+// GET  /api/scores?board=zh|en|hsk1..hsk7|en1..en3&me=<playerId> → { top:[{id,name,score,t}], me:{rank,score}|null }
 // GET  /api/scores?gold=zh|en&me=<playerId>                       → { week, lang, top:[{id,name,score,n,t}], me, honors:{week,top}, other }
 //      (zh = HSK golden board, scores /300, pass 180; en = TOEIC golden board, scores /990, pass 450)
 // POST /api/scores {id,name,level,mode,score}                     → { rankLang, rankLevel, total, best }
@@ -34,7 +34,7 @@ function badName(s){
   return joined.length<=4 && BAD_TOK.includes(joined);
 }
 
-const LEVEL_IDS = ['hsk1', 'hsk2', 'hsk3', 'hsk4', 'hsk5', 'hsk6', 'en1', 'en2', 'en3'];
+const LEVEL_IDS = ['hsk1', 'hsk2', 'hsk3', 'hsk4', 'hsk5', 'hsk6', 'hsk7', 'en1', 'en2', 'en3'];
 const BOARDS = ['zh', 'en', 'all', ...LEVEL_IDS];
 const MODES = ['easy', 'normal', 'hard'];
 const MAX_SCORE = 4000; // one round can't reach this (18 chickens x 45 points x 2.6 at HSK 6, plus golden x3)
@@ -80,7 +80,7 @@ const key = (b) => 'xx:lb:' + b;
 // Golden boards are separate: HSK (Chinese) keeps the original keys, TOEIC (English) adds "En".
 const sfx = (lang) => (lang === 'en' ? 'En' : '');
 const gold = (w, lang = 'zh') => 'xx:gold' + sfx(lang) + ':' + w;
-const ZH_COEF = { hsk1: 1, hsk2: 1, hsk3: 2, hsk4: 2, hsk5: 3, hsk6: 3 };
+const ZH_COEF = { hsk1: 1, hsk2: 1, hsk3: 2, hsk4: 2, hsk5: 3, hsk6: 3, hsk7: 4 };
 const EXAM = { zh: { max: 300, pass: 180 }, en: { max: 990, pass: 450 } };
 const langOf = (q) => (q === 'en' ? 'en' : 'zh');
 const validId = (s) => typeof s === 'string' && /^[a-z0-9]{6,32}$/.test(s);
@@ -163,7 +163,7 @@ module.exports = async (req, res) => {
         ]);
         const exams = [];
         for (let i = 0; i + 1 < (flat || []).length; i += 2) {
-          const m = /^(\d{1,5})-(hsk[1-6]|en[1-3])-([0-2])$/.exec(flat[i]);
+          const m = /^(\d{1,5})-(hsk[1-7]|en[1-3])-([0-2])$/.exec(flat[i]);
           if (!m || Number(m[1]) !== week || (m[2].startsWith('en') ? 'en' : 'zh') !== lang) continue;
           const score = Number(flat[i + 1]);
           const coef = lang === 'zh' ? ZH_COEF[m[2]] : 1;
@@ -234,7 +234,7 @@ module.exports = async (req, res) => {
 
       if (b.action === 'exam') {
         // exam id = "<week>-<level>-<n>"; this week's or last week's (a test finished just after midnight Sunday)
-        const m = /^(\d{1,5})-(hsk[1-6]|en[1-3])-([0-2])$/.exec(String(b.exam || ''));
+        const m = /^(\d{1,5})-(hsk[1-7]|en[1-3])-([0-2])$/.exec(String(b.exam || ''));
         const lang = m && m[2].startsWith('en') ? 'en' : 'zh';
         const sx = sfx(lang);
         const score = Math.floor(Number(b.score));
@@ -251,7 +251,7 @@ module.exports = async (req, res) => {
         const [flat] = await redis([['HGETALL', 'xx:exams:' + b.id]]);
         let sum = 0, n = 0;
         for (let k = 0; k + 1 < (flat || []).length; k += 2) {
-          const e = /^(\d{1,5})-(hsk[1-6]|en[1-3])-([0-2])$/.exec(flat[k]);
+          const e = /^(\d{1,5})-(hsk[1-7]|en[1-3])-([0-2])$/.exec(flat[k]);
           if (!e || Number(e[1]) !== w || (e[2].startsWith('en') ? 'en' : 'zh') !== lang) continue;
           const sc = Number(flat[k + 1]);
           if (sc < EXAM[lang].pass) continue;
