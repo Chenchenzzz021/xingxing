@@ -15,7 +15,7 @@ const crypto = require('crypto');
 // Names against Vietnamese fine customs (thuần phong mỹ tục): vulgar and sexual words, insults, leaders' names.
 // BAD_SUB is matched inside the name with diacritics, spaces and punctuation removed ("Đ.ị.t", "d i t m e", "ditttme").
 // BAD_TOK is matched as a whole word with diacritics kept, so "đĩ" is caught but "Đi", "Đàm" or "Các" are not.
-const BAD_SUB=['ditme','ditmia','ditcu','ditbo','ditnhau','dmm','dcm','dkm','dkmm','dmcs','cmnr','vcl','vkl','vailon','lonme','concac','cucac','caicac','daubuoi','duongvat','memay','chomay','occho','occac','sucvat','thangngu','conngu','dongu','dodiem','didiem','phodi','gaigoi','thangcho','hiepdam','loanluan','khieudam','damduc','fuck','fuk','shit','bitch','pussy','cunt','nigg','porn','hentai','asshole','bastard','motherf','dick','penis','vagina','xxx','sex','hochiminh','nguyenphutrong','phandong'];
+const BAD_SUB=['dmc','dml','dmvl','dcmm','dmay','ditme','ditmia','ditcu','ditbo','ditnhau','dmm','dcm','dkm','dkmm','dmcs','cmnr','vcl','vkl','vailon','lonme','concac','cucac','caicac','daubuoi','duongvat','memay','chomay','occho','occac','sucvat','thangngu','conngu','dongu','dodiem','didiem','phodi','gaigoi','thangcho','hiepdam','loanluan','khieudam','damduc','fuck','fuk','shit','bitch','pussy','cunt','nigg','porn','hentai','asshole','bastard','motherf','dick','penis','vagina','xxx','sex','hochiminh','nguyenphutrong','phandong'];
 const BAD_PHRASE=['bác hồ','bac ho','cụ hồ','chủ tịch hồ'];
 const BAD_TOK=['địt','đỵt','đĩ','cặc','lồn','buồi','đéo','đụ','dâm','ngu','đm','đcm','đkm','cl','clm','cc','cmm','cmn','vl','vcl','ml','clgt','loz','djt','dit','cac','lon','cak','dm','dcm','vkl'];
 function badName(s){
