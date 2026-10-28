@@ -1,7 +1,7 @@
 // Shared leaderboards for Xingxing, stored in Upstash Redis (Vercel Storage → Upstash for Redis).
 // GET  /api/scores?board=zh|en|hsk1..hsk6|en1..en3&me=<playerId> → { top:[{id,name,score,t}], me:{rank,score}|null }
 // GET  /api/scores?gold=zh|en&me=<playerId>                       → { week, lang, top:[{id,name,score,n,t}], me, honors:{week,top}, other }
-//      (zh = HSK golden board, scores /300, pass 180; en = TOEIC golden board, scores /990, pass 600)
+//      (zh = HSK golden board, scores /300, pass 180; en = TOEIC golden board, scores /990, pass 450)
 // POST /api/scores {id,name,level,mode,score}                     → { rankLang, rankLevel, total, best }
 // POST /api/scores {action:'rename',id,name}                      → { ok }
 // POST /api/scores {action:'exam',id,name,exam,score}             → { ok, dup, lang, avg, n, rank } (exam '<week>-hsk3-0' or '<week>-en2-1')

@@ -87,6 +87,17 @@ button{font-family:inherit;color:inherit}
 .chk .tb i{display:block;height:100%;width:100%;background:var(--ok);transform-origin:left;will-change:transform}
 .chk.warn .tb i{background:var(--bad)}
 .chk.spawn{animation:pop .35s ease-out}
+/* Golden chicken: drops from the sky by parachute, worth SPECIAL_MUL points */
+.chk.special svg{filter:drop-shadow(0 0 7px #ffe066) drop-shadow(0 0 2px #ffb800)}
+.chk.special .q{background:#ffd84a;border-color:#7a4a00}
+.chk.special .q::before{content:'★';margin-right:2px;color:#b45f00}
+.chk .chute{position:absolute;left:50%;bottom:92%;width:120%;transform:translateX(-50%);pointer-events:none;display:none}
+.chk.drop .chute{display:block;animation:sway .6s infinite alternate ease-in-out}
+.chk.drop .tag{display:none}
+.chk.drop .leg1,.chk.drop .leg2{animation-duration:.9s}
+@keyframes sway{from{transform:translateX(-50%) rotate(-6deg)}to{transform:translateX(-50%) rotate(6deg)}}
+.chk.landed{animation:land .35s ease-out}
+@keyframes land{0%{scale:1.15 .8}60%{scale:.95 1.08}100%{scale:1 1}}
 @keyframes pop{0%{opacity:0}100%{opacity:1}}
 
 .ball{position:absolute;left:0;top:0;width:28px;height:24px;margin:-12px 0 0 -12px;background-size:100% 100%;z-index:5000;will-change:transform;pointer-events:none}
@@ -437,7 +448,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 21;
+const VERSION = 22;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -581,6 +592,8 @@ function playDumb(){
 
 /* ================= ART ================= */
 const INK='#2a2320';
+const SPECIAL_MUL=3, SPECIAL_GEM=3, SPECIAL_LOOK={body:'#ffd84a',wing:'#f5bf1c',hat:'crown',weapon:'sword'};
+const CHUTE=`<svg class="chute" viewBox="0 0 120 70"><path d="M8 34 Q60 -18 112 34 Q99 26 86 34 Q73 26 60 34 Q47 26 34 34 Q21 26 8 34Z" fill="#ff5d5d" stroke="#2a2320" stroke-width="3"/><path d="M34 34 Q47 26 60 34 L60 34 Q47 26 34 34" fill="#fff"/><path d="M60 34 Q73 26 86 34 Q73 2 60 0 Q47 2 34 34 Q47 26 60 34Z" fill="#fff" stroke="#2a2320" stroke-width="3"/><path d="M10 35 L52 70 M36 35 L56 70 M84 35 L64 70 M110 35 L68 70" stroke="#2a2320" stroke-width="2"/></svg>`;
 const LOOKS=[
   {body:'#fff6e3',wing:'#f1dfbb',hat:'none',weapon:'shovel'},
   {body:'#fff6e3',wing:'#f1dfbb',hat:'viking',weapon:'axe'},
@@ -706,11 +719,17 @@ function pickWords(level,n){
   save.used[level.id]=(save.used[level.id]||[]).concat(pick.map(w=>w.k)); persist();
   return pick;
 }
+// 1-2 random chickens per round are golden and parachute in from the sky
+function specialSlots(total){
+  const n=total>=12&&Math.random()<0.5?2:1, set=new Set();
+  while(set.size<n) set.add(1+rand(total-1));
+  return set;
+}
 function startGame(){
   const level=LEVELS.find(l=>l.id===save.set.lv), mode=MODES[save.set.mode];
   if(G) for(const c of G.chks) c.el.remove();
   stage.querySelectorAll('.ball,.puff,.float,.toast').forEach(e=>e.remove());
-  G={level,mode,stage:stageOf(level),words:pickWords(level,mode.total),hp:100,score:0,combo:0,spawned:0,resolved:0,chks:[],t:0,lastSpawn:-99,paused:false,modal:null,log:[],over:false,qn:0,gemsEarned:0};
+  G={level,mode,stage:stageOf(level),words:pickWords(level,mode.total),hp:100,score:0,combo:0,spawned:0,resolved:0,chks:[],t:0,lastSpawn:-99,paused:false,modal:null,log:[],over:false,qn:0,gemsEarned:0,special:specialSlots(mode.total)};
   wall.className='';
   $('#hud').hidden=false; $('#timeBtn').hidden=false; hud(); closeOverlay();
   last=performance.now(); stage.classList.remove('paused');
@@ -744,12 +763,18 @@ function laneY(){
   return best;
 }
 function spawn(){
+  const special=G.special.has(G.spawned);
   const word=G.words[G.spawned++]; const y=laneY(); const s=chickenSize(y);
-  const look=LOOKS[rand(LOOKS.length)];
-  const el=document.createElement('div'); el.className='chk spawn';
-  el.innerHTML=`<div class="tag"><div class="q">?</div><div class="tb"><i></i></div></div>${chickenSVG(look)}<div class="hit"></div>`;
-  el.setAttribute('role','button'); el.setAttribute('aria-label','Gà mang từ vựng, chạm để trả lời');
-  const c={el,word,y,s,start:G.t,dur:G.mode.dur,x0:s*0.55,state:'run',qEl:el.querySelector('.q'),bar:el.querySelector('.tb i')};
+  const look=special?SPECIAL_LOOK:LOOKS[rand(LOOKS.length)];
+  const el=document.createElement('div'); el.className=special?'chk special drop':'chk spawn';
+  el.innerHTML=`${special?CHUTE:''}<div class="tag"><div class="q">?</div><div class="tb"><i></i></div></div>${chickenSVG(look)}<div class="hit"></div>`;
+  el.setAttribute('role','button'); el.setAttribute('aria-label',special?'Gà vàng nhiều điểm, chạm để trả lời':'Gà mang từ vựng, chạm để trả lời');
+  const c={el,word,y,s,start:G.t,dur:G.mode.dur,x0:s*0.55,state:'run',qEl:el.querySelector('.q'),bar:el.querySelector('.tb i'),special};
+  if(special){
+    // lands somewhere along the first part of the path, keeps the full answer time
+    c.x0=s*0.55+Math.random()*Math.max(0,(W-wallW)*0.35); c.state='drop'; c.dropT0=G.t; c.dy=-s*1.6;
+    toast('⭐ <b>Gà vàng</b> rơi xuống! Trả lời đúng được <b>×'+SPECIAL_MUL+' điểm</b>');
+  }
   c.x=c.x0;
   el.addEventListener('pointerdown',e=>{e.preventDefault(); onChickenTap(c)});
   stage.appendChild(el); G.chks.push(c); placeChicken(c); SFX.cluck(); G.lastSpawn=G.t;
@@ -758,7 +783,7 @@ function targetX(c){return W-wallW-c.s*0.32}
 function placeChicken(c){
   c.s=chickenSize(c.y);
   c.el.style.width=c.s+'px';
-  c.el.style.transform=`translate3d(${c.x-c.s/2}px,${c.y-c.s*150/140}px,0)`;
+  c.el.style.transform=`translate3d(${c.x-c.s/2}px,${(c.dy!=null?c.dy:c.y)-c.s*150/140}px,0)`;
   c.el.style.zIndex=100+Math.round(c.y);
 }
 function onChickenTap(c){
@@ -772,9 +797,15 @@ function loop(now){
   const dt=Math.min(0.05,(now-last)/1000); last=now;
   if(G&&!G.paused&&!G.over){
     G.t+=dt;
-    const alive=G.chks.filter(c=>c.state==='run'||c.state==='charge').length;
+    const alive=G.chks.filter(c=>c.state==='run'||c.state==='charge'||c.state==='drop').length;
     if(G.spawned<G.mode.total && alive<G.mode.per && G.t-G.lastSpawn>=G.mode.gap && G.t-(G.lastResolve||-99)>=(G.mode.per===1?1.2:0)) spawn();
     for(const c of G.chks){
+      if(c.state==='drop'){
+        const p=Math.min(1,(G.t-c.dropT0)/1.4), top=-c.s*1.6;
+        c.dy=top+(c.y-top)*(1-(1-p)*(1-p)); placeChicken(c);
+        if(p>=1){ c.dy=null; c.state='run'; c.start=G.t; c.el.classList.remove('drop'); c.el.classList.add('landed'); c.el.querySelector('.chute')?.remove(); SFX.cluck(); feathers(c.x,c.y-c.s*0.2,6); }
+        continue;
+      }
       if(c.state!=='run'&&c.state!=='charge') continue;
       const p=Math.min(1,(G.t-c.start)/c.dur);
       c.x=c.x0+(targetX(c)-c.x0)*p;
@@ -962,10 +993,10 @@ function answered(ok,exact){
     G.combo++;
     let pts=10+(quick?5:0)+(exact?5:0)+Math.min(10,(G.combo-1)*2);
     if(M.listened) pts=Math.max(5,pts-LISTEN_COST);
-    const mul=PTS_MUL[G.level.id]||1; pts=Math.round(pts*mul);
-    G.score+=pts; G.log.push({w,ok:true}); c.logged=true; G.gemsEarned++;
+    const mul=PTS_MUL[G.level.id]||1; pts=Math.round(pts*mul*(c.special?SPECIAL_MUL:1));
+    G.score+=pts; G.log.push({w,ok:true}); c.logged=true; G.gemsEarned+=c.special?SPECIAL_GEM:1;
     SFX.ok(); speak(G.level.lang==='zh'?w.h:w.en,G.level.lang);
-    const extra=[mul>1?`Cấp độ ×${mul}`:'',M.listened?`Có nghe −${LISTEN_COST}`:'',exact?'Chuẩn cả thanh điệu! +5':'',quick?'Nhanh tay! +5':'',G.combo>1?`Liên hoàn x${G.combo}`:''].filter(Boolean).join(' · ');
+    const extra=[c.special?`⭐ Gà vàng ×${SPECIAL_MUL}, +${SPECIAL_GEM} Gem`:'',mul>1?`Cấp độ ×${mul}`:'',M.listened?`Có nghe −${LISTEN_COST}`:'',exact?'Chuẩn cả thanh điệu! +5':'',quick?'Nhanh tay! +5':'',G.combo>1?`Liên hoàn x${G.combo}`:''].filter(Boolean).join(' · ');
     fb.innerHTML=`<div class="fb ok"><b>Đúng rồi! +${pts}</b>${extra?' <span style="opacity:.8">('+extra+')</span>':''}<br>${revealLine(w)}</div>`; fitCard();
     setTimeout(()=>{ closeQuestion(); c.state='shot';
       fireAt(c,()=>{ SFX.pop(); boom(c.x,c.y-c.s*0.5,c.s*0.9); feathers(c.x,c.y-c.s*0.5,12); floatText(c.x,c.y-c.s,'+'+pts); removeChicken(c); resolveOne(); });
