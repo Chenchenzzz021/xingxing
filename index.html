@@ -164,6 +164,28 @@ button{font-family:inherit;color:inherit}
 .pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px;font-weight:800}
 .pager .btn{padding:4px 14px;font-size:18px;min-width:52px}
 .pager .btn:disabled{opacity:.35}
+.btn.gold{background:#ffcf3f;color:var(--ink)}
+.ttl{font-size:.95em}
+.honor{margin-top:8px;border:3px solid var(--ink);border-radius:14px;background:linear-gradient(#fff6cf,#ffe58a);padding:6px 10px;text-align:center}
+.honor .ht{font-weight:800;font-size:13px}
+.honor .hl{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 12px;font-size:13px}
+.honor .hl i{font-style:normal;opacity:.7;font-size:12px}
+.excs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.exc{border:3px solid var(--ink);border-radius:16px;background:#fff;padding:8px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:0 3px 0 var(--ink)}
+.exc.done{background:var(--cream)}
+.exc .t{font-weight:800;font-size:18px}
+.exc .st{font-size:13px;font-weight:600;opacity:.8}
+.exc .sc{font-weight:800;font-size:26px;line-height:1}.exc .sc small{font-size:12px;opacity:.6}
+.exc .sc.ok{color:var(--ok)}.exc .sc.no{color:var(--bad)}
+.exc .btn{font-size:16px;padding:5px 10px;width:100%}
+.exc .btn:disabled{opacity:.45}
+.opt.hz{font-family:var(--han);font-size:24px;justify-content:flex-start}
+.opt.pick{background:#dfe9ff;border-color:var(--royal2)}
+.exam .clock{font-variant-numeric:tabular-nums}.exam .clock.low{color:var(--bad)}
+.say.big{width:76px;height:76px}.say.big svg{width:36px;height:36px}
+.exscore{font-weight:800;font-size:64px;line-height:1;margin:8px 0}.exscore small{font-size:22px;opacity:.6}
+.exscore.ok{color:var(--ok)}.exscore.no{color:var(--bad)}
+.lb.gold .n{font-size:13px;opacity:.65;flex:none}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
 .lab{font-weight:700;font-size:14px;letter-spacing:.04em;margin-right:2px}
 .seg{display:flex;border:3px solid var(--ink);border-radius:12px;overflow:hidden;background:#fff}
@@ -402,8 +424,17 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 9;
-const DICT_COST = 30;
+const VERSION = 10;
+// Higher levels are worth more per correct answer
+const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,en1:1,en2:1.5,en3:2};
+// Dictionary is unlocked per level; harder levels cost more
+const DICT_PRICE = {hsk1:10,hsk2:15,hsk3:25,hsk4:35,hsk5:50,hsk6:70,en1:10,en2:25,en3:45};
+// HSK exams: 3 per level each week, bought with Gems, one attempt each
+const EXAM_PRICE = {hsk1:5,hsk2:8,hsk3:12,hsk4:18,hsk5:25,hsk6:30};
+const EXAM_Q = {hsk1:20,hsk2:25,hsk3:30,hsk4:30,hsk5:35,hsk6:40};
+const EXAM_SEC = 18, EXAM_MAX = 300, EXAM_PASS = 180;
+const TITLES = {1:['👑','Thiên hạ vô địch'],2:['🐉','Trên vạn người, dưới một người'],3:['🌟','Thần đồng ngôn ngữ']};
+const REWARD = {1:100,2:60,3:40};
 
 /* ================= STORAGE ================= */
 const SKEY='bangavocab_v1';
@@ -414,6 +445,9 @@ if(!save.pid){save.pid=(Date.now().toString(36)+Math.random().toString(36).slice
 if(!Array.isArray(save.pending)) save.pending=[];
 if(!save.v9){ save.used={}; save.v9=1; persist(); }
 save.stage=save.stage||{}; save.learned=save.learned||{};
+// v10: dictionary unlocks per level; an old all-in-one unlock (30 Gem) keeps HSK 1, HSK 2 and English beginner
+if(save.dict===true) save.dict={hsk1:true,hsk2:true,en1:true};
+save.dict=save.dict||{}; save.exams=save.exams||{}; save.claimed=save.claimed||{};
 const stageOf=L=>Math.min(L.stages,Math.max(1,save.stage[L.id]||1));
 const learnedOf=L=>save.learned[L.id]||[];
 const COST={hint:2,time:1};
@@ -896,9 +930,10 @@ function answered(ok,exact){
     G.combo++;
     let pts=10+(quick?5:0)+(exact?5:0)+Math.min(10,(G.combo-1)*2);
     if(M.listened) pts=Math.max(5,pts-LISTEN_COST);
+    const mul=PTS_MUL[G.level.id]||1; pts=Math.round(pts*mul);
     G.score+=pts; G.log.push({w,ok:true}); c.logged=true; G.gemsEarned++;
     SFX.ok(); speak(G.level.lang==='zh'?w.h:w.en,G.level.lang);
-    const extra=[M.listened?`Có nghe −${LISTEN_COST}`:'',exact?'Chuẩn cả thanh điệu! +5':'',quick?'Nhanh tay! +5':'',G.combo>1?`Liên hoàn x${G.combo}`:''].filter(Boolean).join(' · ');
+    const extra=[mul>1?`Cấp độ ×${mul}`:'',M.listened?`Có nghe −${LISTEN_COST}`:'',exact?'Chuẩn cả thanh điệu! +5':'',quick?'Nhanh tay! +5':'',G.combo>1?`Liên hoàn x${G.combo}`:''].filter(Boolean).join(' · ');
     fb.innerHTML=`<div class="fb ok"><b>Đúng rồi! +${pts}</b>${extra?' <span style="opacity:.8">('+extra+')</span>':''}<br>${revealLine(w)}</div>`; fitCard();
     setTimeout(()=>{ closeQuestion(); c.state='shot';
       fireAt(c,()=>{ SFX.pop(); boom(c.x,c.y-c.s*0.5,c.s*0.9); feathers(c.x,c.y-c.s*0.5,12); floatText(c.x,c.y-c.s,'+'+pts); removeChicken(c); resolveOne(); });
@@ -956,6 +991,7 @@ function menu(){
   if(G){ for(const c of G.chks) c.el.remove(); G=null; }
   setTower(1); $('#whpBar').style.width='100%'; $('#whpNum').textContent=100; $('#whp').className='whp';
   $('#hud').hidden=true; $('#timeBtn').hidden=true; stage.classList.remove('paused');
+  if(save.examRun){ finishExam(menu); return; }
   flushPending();
   const s=save.set;
   const levels=LEVELS.filter(l=>l.lang===s.lang);
@@ -975,10 +1011,12 @@ function menu(){
     </div>
     <div class="hint" id="modeHint"></div>
     <div class="row" style="justify-content:space-between;margin-top:8px;flex-wrap:nowrap">
-      <button class="chip" id="nameBtn" style="min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"><span class="who" style="min-width:0;overflow:hidden;text-overflow:ellipsis">Tài khoản: <b>${esc(save.name||'bấm để nhập tên')}</b>${save.name?' <span style="opacity:.6;font-weight:600">· đổi tên</span>':''}</span></button>
+      <button class="chip" id="nameBtn" style="min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"><span class="who" style="min-width:0;overflow:hidden;text-overflow:ellipsis">Tài khoản: <b>${save.name?nameT(save.name,myTitle()):'bấm để nhập tên'}</b>${save.name?' <span style="opacity:.6;font-weight:600">· đổi tên</span>':''}</span></button>
       <span class="chip" style="cursor:default;flex:none">${GEM} ${save.gems}</span>
     </div>
-    <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn" id="playBtn" style="flex:2 1 0;font-size:21px;line-height:1.05">Bảo vệ thành!<small id="playSt" style="display:block;font-size:13px;opacity:.85"></small></button><div style="flex:1 1 0;display:flex;flex-direction:column;gap:6px;min-width:0"><button class="btn blue" id="boardBtn" style="flex:none;font-size:15px;padding:5px 4px">Xếp hạng</button><button class="btn alt" id="dictBtn" style="flex:none;font-size:15px;padding:5px 4px">${save.dict?'':'🔒 '}Từ điển</button></div></div>
+    <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn" id="playBtn" style="flex:2 1 0;font-size:21px;line-height:1.05">Bảo vệ thành!<small id="playSt" style="display:block;font-size:13px;opacity:.85"></small></button><div style="flex:1 1 0;display:flex;flex-direction:column;gap:6px;min-width:0"><button class="btn blue" id="boardBtn" style="flex:none;font-size:15px;padding:5px 4px">Xếp hạng</button><button class="btn alt" id="dictBtn" style="flex:none;font-size:15px;padding:5px 4px">${save.dict[save.set.lv]?'':'🔒 '}Từ điển</button></div></div>
+    <div class="btns" style="margin-top:8px;flex-wrap:nowrap"><button class="btn gold" id="examBtn" style="flex:1 1 0;font-size:16px;padding:6px 4px">📝 Đề thi HSK</button><button class="btn gold" id="goldBtn" style="flex:1 1 0;font-size:16px;padding:6px 4px">🏆 Bảng vàng</button></div>
+    <div class="honor" id="honorLine" hidden></div>
     <div class="verline">Xingxing · Phiên bản ${VERSION}</div>
   </div>`);
   const mh=()=>{const m=MODES[save.set.mode]; $('#modeHint').textContent=`${m.per===1?'1 gà mỗi lượt':'Tối đa '+m.per+' gà cùng lúc'} · ${m.dur} giây tới tường · ${m.total} gà · tường chịu 3 lần húc`};
@@ -986,12 +1024,15 @@ function menu(){
   const ps=()=>{const L=LEVELS.find(l=>l.id===save.set.lv); $('#playSt').textContent=lvName(L)+' · Màn '+stageOf(L)+'/'+L.stages;}; ps();
   $('#dictBtn').onclick=()=>openDict(save.set.lv,menu);
   ovl.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{save.set.lang=b.dataset.lang; save.set.lv=LEVELS.find(l=>l.lang===save.set.lang).id; persist(); menu()});
-  ovl.querySelectorAll('.lv').forEach(b=>b.onclick=()=>{save.set.lv=b.dataset.lv; persist(); ovl.querySelectorAll('.lv').forEach(x=>x.setAttribute('aria-pressed',x===b)); ps()});
+  ovl.querySelectorAll('.lv').forEach(b=>b.onclick=()=>{save.set.lv=b.dataset.lv; persist(); ovl.querySelectorAll('.lv').forEach(x=>x.setAttribute('aria-pressed',x===b)); ps(); $('#dictBtn').textContent=(save.dict[save.set.lv]?'':'🔒 ')+'Từ điển';});
   ovl.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{save.set.mode=b.dataset.mode; persist(); ovl.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',x===b)); mh()});
   $('#optType').onclick=e=>{save.set.type=!save.set.type; persist(); e.currentTarget.setAttribute('aria-pressed',save.set.type)};
   $('#optSound').onclick=e=>{save.set.sound=!save.set.sound; persist(); e.currentTarget.setAttribute('aria-pressed',save.set.sound)};
   $('#playBtn').onclick=()=>{ac(); startGame()};
-  $('#boardBtn').onclick=()=>showBoard(save.set.lv,menu);
+  $('#boardBtn').onclick=()=>showBoard(save.set.lang,menu);
+  $('#examBtn').onclick=()=>openExams(save.set.lang==='zh'&&save.set.lv.startsWith('hsk')?save.set.lv:'hsk1',menu);
+  $('#goldBtn').onclick=()=>openGold(menu);
+  loadHonors();
   $('#nameBtn').onclick=()=>askName(menu);
 }
 const NAME_MAX=20, RENAME_COST=5;
@@ -1034,25 +1075,33 @@ async function submitScore(entry){
 async function flushPending(){
   if(!save.name||!save.pending.length) return;
   const list=save.pending.slice(); save.pending=[]; persist();
-  for(const e of list){ try{ await submitScore(e); }catch(err){ save.pending.push(e); } }
+  for(const e of list){ try{ await (e.type==='exam'?submitExam(e):submitScore(e)); }catch(err){ save.pending.push(e); } }
   persist();
 }
+function nameT(name,t){ const T=TITLES[t]; return esc(name||'Ẩn danh')+(T?` <span class="ttl" title="${T[1]}">${T[0]}</span>`:''); }
 function showBoard(board,back){
-  const tabs=[['all','Tổng điểm']].concat(LEVELS.map(l=>[l.id,(l.lang==='en'?'Anh ':'')+l.name]));
-  if(!tabs.some(t=>t[0]===board)) board='all';
-  showOverlay(`<div class="card pop-in"><h2>Bảng xếp hạng</h2>
-    <div class="hint">${board==='all'?'Tổng điểm cộng dồn của tất cả các màn đã chơi.':'Điểm cao nhất một lượt chơi ở màn này.'}</div>
+  const lang=LEVELS.find(l=>l.id===board)?.lang||(board==='en'?'en':board==='zh'?'zh':save.set.lang);
+  const tabs=[[lang,'Tổng điểm']].concat(LEVELS.filter(l=>l.lang===lang).map(l=>[l.id,l.name]));
+  if(!tabs.some(t=>t[0]===board)) board=lang;
+  const isTotal=board===lang;
+  showOverlay(`<div class="card pop-in"><h2>Bảng xếp hạng ${lang==='zh'?'tiếng Trung':'tiếng Anh'}</h2>
+    <div class="tabs" role="group" aria-label="Ngôn ngữ" style="margin:6px 0 4px">
+      <button class="tab" data-lb="zh" aria-pressed="${lang==='zh'}">Tiếng Trung</button>
+      <button class="tab" data-lb="en" aria-pressed="${lang==='en'}">Tiếng Anh</button>
+    </div>
+    <div class="hint">${isTotal?'Tổng điểm cộng dồn của mọi màn '+(lang==='zh'?'tiếng Trung':'tiếng Anh')+' đã chơi.':'Điểm cao nhất một lượt chơi ở cấp độ này.'}</div>
     <div class="lbtabs" role="group" aria-label="Chọn bảng">${tabs.map(([k,n])=>`<button data-b="${k}" aria-pressed="${k===board}">${esc(n)}</button>`).join('')}</div>
     <ul class="lb" id="lbList"><li class="lbmsg" style="display:block">Đang tải...</li></ul>
     <div class="btns"><button class="btn alt" id="lbBack">Quay lại</button></div></div>`, true);
   ovl.querySelectorAll('.lbtabs button').forEach(b=>b.onclick=()=>showBoard(b.dataset.b,back));
+  ovl.querySelectorAll('[data-lb]').forEach(b=>b.onclick=()=>showBoard(b.dataset.lb,back));
   const cur=ovl.querySelector('.lbtabs [aria-pressed="true"]'); if(cur) cur.scrollIntoView({inline:'center',block:'nearest'});
   $('#lbBack').onclick=back;
   api('GET',null,`?board=${board}&me=${encodeURIComponent(save.pid)}`).then(d=>{
     const el=$('#lbList'); if(!el) return;
     if(!d.top||!d.top.length){ el.innerHTML='<li class="lbmsg" style="display:block">Chưa có ai trên bảng này. Chơi một màn để giành hạng 1!</li>'; return; }
-    let html=d.top.map((r,i)=>`<li class="${r.id===save.pid?'me':''}"><span class="rk">${i+1}</span><span class="nm">${esc(r.name||'Ẩn danh')}</span><span class="sc">${r.score}</span></li>`).join('');
-    if(d.me&&d.me.rank>d.top.length) html+=`<li class="me"><span class="rk">${d.me.rank}</span><span class="nm">${esc(save.name||'Bạn')}</span><span class="sc">${d.me.score}</span></li>`;
+    let html=d.top.map((r,i)=>`<li class="${r.id===save.pid?'me':''}"><span class="rk">${i+1}</span><span class="nm">${nameT(r.name,r.t)}</span><span class="sc">${r.score}</span></li>`).join('');
+    if(d.me&&d.me.rank>d.top.length) html+=`<li class="me"><span class="rk">${d.me.rank}</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="sc">${d.me.score}</span></li>`;
     el.innerHTML=html; fitCard();
   }).catch(()=>{
     const el=$('#lbList'); if(!el) return;
@@ -1095,7 +1144,7 @@ function endGame(win){
     const send=()=>{
       box.innerHTML='<div class="subline">Đang gửi điểm lên bảng xếp hạng...</div>';
       submitScore(entry).then(d=>{
-        box.innerHTML=`<div class="subline">Bạn đứng hạng <b>#${d.rankAll}</b> tổng điểm và hạng <b>#${d.rankLevel}</b> ở ${esc(L.name)}. <a href="#" id="seeBoard">Xem bảng</a></div>`;
+        box.innerHTML=`<div class="subline">Bạn đứng hạng <b>#${d.rankLang||d.rankAll}</b> tổng điểm ${L.lang==='zh'?'tiếng Trung':'tiếng Anh'} và hạng <b>#${d.rankLevel}</b> ở ${esc(L.name)}. <a href="#" id="seeBoard">Xem bảng</a></div>`;
         $('#seeBoard').onclick=e=>{e.preventDefault(); showBoard(L.id,menu)};
         fitCard();
       }).catch(()=>{
@@ -1116,17 +1165,24 @@ function endGame(win){
 /* Dictionary: every word the player has met, unlocked once with Gems */
 function openDict(lv,back,page=0){
   const L=LEVELS.find(l=>l.id===lv)||LEVELS[0];
-  if(!save.dict){
+  if(!save.dict[L.id]){
+    const DICT_COST=DICT_PRICE[L.id], lvs=LEVELS.filter(l=>l.lang===L.lang);
     const can=save.gems>=DICT_COST;
     showOverlay(`<div class="card pop-in" style="text-align:center;max-width:420px">
-      <h2>📖 Từ điển</h2>
-      <div class="hint" style="margin:6px 0 10px">Xem lại mọi từ bạn đã gặp khi bắn gà: chữ Hán, pinyin, nghĩa và nghe cách đọc. Mở khóa một lần, dùng mãi mãi.</div>
+      <h2>📖 Từ điển ${esc(lvName(L))}</h2>
+      <div class="tabs" role="group" aria-label="Ngôn ngữ" style="margin-top:6px">
+        <button class="tab" data-l="hsk1" aria-pressed="${L.lang==='zh'}">Tiếng Trung</button>
+        <button class="tab" data-l="en1" aria-pressed="${L.lang==='en'}">Tiếng Anh</button>
+      </div>
+      <div class="dlv">${lvs.map(l=>`<button data-l="${l.id}" aria-pressed="${l.id===L.id}">${save.dict[l.id]?'':'🔒 '}${l.name}</button>`).join('')}</div>
+      <div class="hint" style="margin:6px 0 10px">Xem lại mọi từ ${esc(lvName(L))} bạn đã gặp: ${L.lang==='zh'?'chữ Hán, pinyin, ':''}nghĩa và nghe cách đọc. Mỗi cấp độ mở khóa riêng, mở một lần dùng mãi mãi. Cấp càng cao giá càng nhiều Gem.</div>
       <div class="gembar">Giá mở khóa: ${DICT_COST} ${GEM} <span style="opacity:.6;font-weight:600">(đang có ${save.gems})</span></div>
       ${can?'':`<div class="hint" style="margin-top:6px">Bạn cần thêm ${DICT_COST-save.gems} Gem. Mỗi câu đúng được 1 Gem.</div>`}
       <div class="btns" style="margin-top:12px;flex-wrap:nowrap"><button class="btn" id="dBuy" ${can?'':'disabled'} style="flex:2 1 0">Mở khóa</button><button class="btn alt" id="dBack" style="flex:1 1 0">Quay lại</button></div>
     </div>`);
     $('#dBack').onclick=back;
-    $('#dBuy').onclick=()=>{ if(!spend(DICT_COST)) return; save.dict=true; persist(); SFX.win(); openDict(lv,back); };
+    ovl.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>openDict(b.dataset.l,back));
+    $('#dBuy').onclick=()=>{ if(!spend(DICT_COST)) return; save.dict[L.id]=true; persist(); SFX.win(); openDict(L.id,back); };
     return;
   }
   const keys=learnedOf(L), byK=new Map(L.words.map(w=>[w.k,w]));
@@ -1141,7 +1197,7 @@ function openDict(lv,back,page=0){
       <button class="tab" data-l="hsk1" aria-pressed="${L.lang==='zh'}">Tiếng Trung</button>
       <button class="tab" data-l="en1" aria-pressed="${L.lang==='en'}">Tiếng Anh</button>
     </div>
-    <div class="dlv">${lvs.map(l=>`<button data-l="${l.id}" aria-pressed="${l.id===L.id}">${l.name} <span style="opacity:.7">${learnedOf(l).length}</span></button>`).join('')}</div>
+    <div class="dlv">${lvs.map(l=>`<button data-l="${l.id}" aria-pressed="${l.id===L.id}">${save.dict[l.id]?'':'🔒 '}${l.name} <span style="opacity:.7">${learnedOf(l).length}</span></button>`).join('')}</div>
     <div class="hint" style="text-align:center">Đã học <b>${words.length}</b>/${L.words.length} từ của ${esc(lvName(L))}</div>
     <ul class="dl">${rows||'<li class="empty">Chưa có từ nào ở cấp này. Bắn gà và trả lời câu hỏi để thêm từ vào từ điển nhé!</li>'}</ul>
     <div class="pager"><button class="btn alt" id="dPrev" ${page>0?'':'disabled'} aria-label="Trang trước">‹</button><span>${page+1}/${pages}</span><button class="btn alt" id="dNext" ${page<pages-1?'':'disabled'} aria-label="Trang sau">›</button></div>
@@ -1153,6 +1209,178 @@ function openDict(lv,back,page=0){
   $('#dNext').onclick=()=>openDict(L.id,back,page+1);
   $('#dBack').onclick=back;
 }
+/* ================= HSK EXAMS & GOLDEN BOARD ================= */
+// Weeks run Monday to Sunday, Vietnam time (UTC+7), counted from Monday 2024-01-01 (same formula as the server)
+const WEEK_MS=7*864e5, EPOCH=Date.UTC(2024,0,1);
+function weekId(ms=Date.now()){ const d=new Date(ms+7*3600e3); const day=(d.getUTCDay()+6)%7; return Math.round((Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()-day)-EPOCH)/WEEK_MS); }
+const ddmm=ms=>{const d=new Date(ms); return String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0');};
+const weekRange=w=>ddmm(EPOCH+w*WEEK_MS)+' – '+ddmm(EPOCH+w*WEEK_MS+6*864e5);
+function weekLeft(){ const ms=EPOCH+(weekId()+1)*WEEK_MS-7*3600e3-Date.now(); const d=Math.floor(ms/864e5), h=Math.floor(ms%864e5/3600e3); return d>0?`${d} ngày ${h} giờ`:`${h} giờ`; }
+// seeded random, so every player gets the same three exams in a week
+function rng(seed){ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)>>>0; let t=a; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return ((t^t>>>14)>>>0)/4294967296; }; }
+const seedOf=str=>{ let h=2166136261; for(const c of str){ h^=c.charCodeAt(0); h=Math.imul(h,16777619); } return h>>>0; };
+function srShuffle(a,r){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+const examId=(w,lv,i)=>`${w}-${lv}-${i}`;
+function buildExam(lv,w,i){
+  const L=LEVELS.find(l=>l.id===lv), N=EXAM_Q[lv], r=rng(seedOf('xx'+w+lv));
+  const order=srShuffle(L.words.slice(),r), pick=[];
+  for(let j=0;j<N;j++) pick.push(order[(i*N+j)%order.length]);
+  const r2=rng(seedOf('q'+w+lv+i)), TYPES=['listen','meaning','reverse','pinyin'];
+  return pick.map((w0,j)=>{
+    const type=TYPES[(j+Math.floor(r2()*4))%4];
+    const others=srShuffle(L.words.filter(x=>x.k!==w0.k),r2);
+    const same=others.filter(o=>o.h.length===w0.h.length);
+    const take=(f,pool)=>{ const out=[f(w0)]; for(const o of pool){ if(out.length>=4) break; const v=f(o); if(!out.includes(v)) out.push(v); } return srShuffle(out,r2); };
+    let q;
+    if(type==='listen') q={type,prompt:'Nghe và chọn chữ Hán đúng',show:'',opts:take(x=>x.h,same.concat(others)),ans:w0.h,cls:'hz'};
+    else if(type==='meaning') q={type,prompt:'Chọn nghĩa đúng của từ này',show:w0.h,showCls:'han',opts:take(x=>x.m,others),ans:w0.m,cls:''};
+    else if(type==='reverse') q={type,prompt:'Chữ Hán nào có nghĩa này?',show:w0.m,showCls:'vi',opts:take(x=>x.h,same.concat(others)),ans:w0.h,cls:'hz'};
+    else q={type,prompt:'Chọn pinyin đúng của từ này',show:w0.h,showCls:'han',opts:take(x=>x.py,toneVariants(w0.py,2).map(p=>({py:p})).concat(same,others)),ans:w0.py,cls:'py'};
+    return Object.assign(q,{k:w0.k,say:w0.h});
+  });
+}
+function examResult(id){ return save.exams[id]; }
+function openExams(lv,back){
+  const w=weekId(), L=LEVELS.find(l=>l.id===lv)||LEVELS[0], price=EXAM_PRICE[L.id], N=EXAM_Q[L.id];
+  const cards=[0,1,2].map(i=>{
+    const id=examId(w,L.id,i), r=examResult(id);
+    return `<div class="exc ${r?'done':''}"><div class="t">Đề ${i+1}</div>
+      ${r?`<div class="sc ${r.score>=EXAM_PASS?'ok':'no'}">${r.score}<small>/${EXAM_MAX}</small></div><div class="st">${r.score>=EXAM_PASS?'Đạt':'Chưa đạt'}</div>`
+         :`<div class="st">${N} câu · ${Math.round(N*EXAM_SEC/60)} phút</div><button class="btn" data-ex="${i}" ${save.gems<price?'disabled':''}>${GEM} ${price}</button>`}</div>`;
+  }).join('');
+  showOverlay(`<div class="card pop-in" style="max-width:520px">
+    <h2 style="text-align:center">📝 Đề thi HSK</h2>
+    <div class="dlv">${LEVELS.filter(l=>l.lang==='zh').map(l=>`<button data-xl="${l.id}" aria-pressed="${l.id===L.id}">${l.name}</button>`).join('')}</div>
+    <div class="hint" style="text-align:center">Tuần ${weekRange(w)} · đổi đề sau ${weekLeft()}</div>
+    <div class="excs">${cards}</div>
+    <div class="hint" style="margin-top:8px">Mỗi đề chỉ được làm <b>một lần</b>, thang điểm ${EXAM_MAX}. Đạt từ <b>${EXAM_PASS}</b> điểm sẽ được ghi tên lên 🏆 Bảng vàng tuần này. Bạn đang có ${GEM} ${save.gems}.</div>
+    <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn gold" id="xGold" style="flex:1 1 0">🏆 Bảng vàng</button><button class="btn alt" id="xBack" style="flex:1 1 0">Quay lại</button></div>
+  </div>`);
+  ovl.querySelectorAll('[data-xl]').forEach(b=>b.onclick=()=>openExams(b.dataset.xl,back));
+  ovl.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>confirmExam(L.id,+b.dataset.ex,back));
+  $('#xGold').onclick=()=>openGold(()=>openExams(L.id,back));
+  $('#xBack').onclick=back;
+}
+function confirmExam(lv,i,back){
+  const L=LEVELS.find(l=>l.id===lv), price=EXAM_PRICE[lv], N=EXAM_Q[lv];
+  showOverlay(`<div class="card pop-in" style="max-width:420px;text-align:center">
+    <h2>Đề ${i+1} · ${L.name}</h2>
+    <div class="hint" style="margin:8px 0">${N} câu trắc nghiệm: nghe chọn chữ, chọn nghĩa, chọn chữ Hán, chọn pinyin. Thời gian ${Math.round(N*EXAM_SEC/60)} phút, hết giờ tự nộp bài.</div>
+    <div class="hint"><b>Chỉ được làm một lần.</b> Thoát giữa chừng cũng tính là đã nộp bài.</div>
+    <div class="gembar">Giá: ${price} ${GEM} <span style="opacity:.6;font-weight:600">(đang có ${save.gems})</span></div>
+    <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn" id="xGo" style="flex:2 1 0">Mua và làm bài</button><button class="btn alt" id="xNo" style="flex:1 1 0">Thôi</button></div>
+  </div>`);
+  $('#xNo').onclick=()=>openExams(lv,back);
+  $('#xGo').onclick=()=>{
+    const w=weekId(), id=examId(w,lv,i);
+    if(save.exams[id]) return openExams(lv,back);
+    if(!spend(price)) return;
+    save.examRun={id,lv,i,qs:buildExam(lv,w,i),n:0,ok:0,end:Date.now()+N*EXAM_SEC*1000}; persist();
+    examQ(back);
+  };
+}
+let examTimer=null;
+function examQ(back){
+  const R=save.examRun; if(!R) return back();
+  if(R.n>=R.qs.length||Date.now()>=R.end) return finishExam(back);
+  const q=R.qs[R.n], L=LEVELS.find(l=>l.id===R.lv);
+  showOverlay(`<div class="card pop-in exam" style="max-width:520px" role="dialog" aria-label="Bài thi">
+    <div class="qhead"><span class="pill">Câu ${R.n+1}/${R.qs.length}</span><span>${L.name} · Đề ${R.i+1}</span><span class="clock" id="xClock"></span></div>
+    <div class="word">${q.type==='listen'?`<button class="say listen big" id="xSay" aria-label="Nghe lại">${SPK}</button>`:`<div class="w ${q.showCls}">${esc(q.show)}</div>`}</div>
+    <div class="prompt">${esc(q.prompt)}</div>
+    <div class="opts ${q.opts.some(o=>o.length>22)?'one':''}">${q.opts.map((o,j)=>`<button class="opt ${q.cls}" data-v="${esc(o)}"><span class="k">${j+1}</span><span>${esc(o)}</span></button>`).join('')}</div>
+    <div class="btns" style="margin-top:10px"><button class="btn alt" id="xQuit" style="font-size:16px;padding:6px 14px">Nộp bài sớm</button></div>
+  </div>`);
+  if(q.type==='listen'){ const say=()=>speak(q.say,'zh'); $('#xSay').onclick=say; setTimeout(say,250); }
+  const tick=()=>{ const left=Math.max(0,R.end-Date.now()), el=$('#xClock'); if(el){ el.textContent='⏱ '+Math.floor(left/60000)+':'+String(Math.floor(left%60000/1000)).padStart(2,'0'); el.classList.toggle('low',left<60000); } if(left<=0){ clearInterval(examTimer); finishExam(back); } };
+  clearInterval(examTimer); examTimer=setInterval(tick,500); tick();
+  let picked=false;
+  ovl.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    if(picked) return; picked=true;
+    const ok=b.dataset.v===q.ans; if(ok) R.ok++; R.n++;
+    const L2=LEVELS.find(l=>l.id===R.lv), w=L2.words.find(x=>x.k===q.k); if(w) learn(L2,w);
+    persist(); b.classList.add('pick'); SFX.open();
+    setTimeout(()=>examQ(back),180);
+  });
+  // two taps to hand in early (window.confirm is blocked inside some embeds)
+  $('#xQuit').onclick=e=>{ const t=e.currentTarget; if(t.dataset.sure){ finishExam(back); return; } t.dataset.sure=1; t.textContent='Bấm lần nữa để nộp (câu chưa làm tính sai)'; t.classList.remove('alt'); };
+}
+function finishExam(back){
+  clearInterval(examTimer);
+  const R=save.examRun; if(!R) return back();
+  const total=R.qs.length, score=Math.round(R.ok/total*EXAM_MAX);
+  save.exams[R.id]={score,ok:R.ok,total,at:Date.now()}; delete save.examRun;
+  const L=LEVELS.find(l=>l.id===R.lv), pass=score>=EXAM_PASS;
+  const entry={type:'exam',exam:R.id,score};
+  persist(); pass?SFX.win():SFX.lose();
+  showOverlay(`<div class="card pop-in" style="max-width:440px;text-align:center">
+    <h2>Kết quả Đề ${R.i+1} · ${L.name}</h2>
+    <div class="exscore ${pass?'ok':'no'}">${score}<small>/${EXAM_MAX}</small></div>
+    <div class="gembar">${pass?'🎉 Đạt! Bạn đủ điều kiện lên Bảng vàng':'Chưa đạt, cần từ '+EXAM_PASS+' điểm'}</div>
+    <div class="hint">Đúng ${R.ok}/${total} câu. Các từ trong đề đã được thêm vào Từ điển ${esc(L.name)}.</div>
+    <div id="xSub" class="subline"></div>
+    <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn gold" id="xG" style="flex:1 1 0">🏆 Bảng vàng</button><button class="btn blue" id="xMore" style="flex:1 1 0">Đề khác</button><button class="btn alt" id="xM" style="flex:1 1 0">Menu</button></div>
+  </div>`);
+  $('#xG').onclick=()=>openGold(menu); $('#xMore').onclick=()=>openExams(L.id,menu); $('#xM').onclick=menu;
+  const box=$('#xSub');
+  if(!save.name){ save.pending.push(entry); persist(); box.textContent='Nhập tên tài khoản ở menu để gửi điểm lên Bảng vàng.'; return; }
+  box.textContent='Đang gửi điểm lên Bảng vàng...';
+  submitExam(entry).then(d=>{
+    box.innerHTML=d.rank?`Bạn đang đứng hạng <b>#${d.rank}</b> trên Bảng vàng tuần này, điểm trung bình <b>${d.avg}</b> sau ${d.n} đề.`:`Điểm trung bình tuần này của bạn: <b>${d.avg}</b> sau ${d.n} đề. Đạt một đề từ ${EXAM_PASS} điểm để lên Bảng vàng.`;
+    fitCard();
+  }).catch(()=>{ save.pending.push(entry); persist(); box.textContent='Chưa gửi được điểm, game sẽ tự gửi lại lần sau.'; fitCard(); });
+}
+async function submitExam(e){ return api('POST',{action:'exam',id:save.pid,name:save.name,exam:e.exam,score:e.score}); }
+let HONORS=null;
+function myTitle(){ const r=HONORS&&HONORS.top.find(x=>x.id===save.pid); return r?r.rank:(save.title&&save.title.week===weekId()-1?save.title.rank:0); }
+function honorHTML(h){ return h.top.map(r=>`<span>${TITLES[r.rank][0]} <b>${esc(r.name||'Ẩn danh')}</b> <i>${TITLES[r.rank][1]}</i></span>`).join(''); }
+function loadHonors(){
+  api('GET',null,`?gold=1&me=${encodeURIComponent(save.pid)}`).then(d=>{
+    HONORS=d.honors; const mine=HONORS.top.find(x=>x.id===save.pid);
+    save.title=mine?{week:HONORS.week,rank:mine.rank}:null; persist();
+    const el=$('#honorLine');
+    if(el&&HONORS.top.length){ el.innerHTML=`<div class="ht">🏆 Vinh danh tuần ${weekRange(HONORS.week)}</div><div class="hl">${honorHTML(HONORS)}</div>`; el.hidden=false; fitCard(); }
+    if(mine&&!save.claimed[HONORS.week]) claimReward(mine.rank);
+  }).catch(()=>{});
+}
+function claimReward(rank){
+  api('POST',{action:'claim',id:save.pid}).then(d=>{
+    save.claimed[d.week??HONORS.week]=1; persist();
+    if(!d.ok) return;
+    save.gems+=d.gems; persist(); hud(); SFX.win();
+    const T=TITLES[d.rank];
+    showOverlay(`<div class="card pop-in" style="max-width:420px;text-align:center">
+      <div style="font-size:64px;line-height:1">${T[0]}</div>
+      <h2>Hạng ${d.rank} Bảng vàng tuần trước!</h2>
+      <div class="gembar" style="font-size:20px">${T[1]}</div>
+      <div class="hint">Toàn server đã được thông báo. Danh hiệu ${T[0]} hiện cạnh tên bạn suốt tuần này.</div>
+      <div class="gembar">+${d.gems} ${GEM} Gem</div>
+      <button class="btn big" id="hOk">Nhận thưởng</button></div>`);
+    $('#hOk').onclick=menu;
+  }).catch(()=>{});
+}
+function openGold(back){
+  const w=weekId();
+  showOverlay(`<div class="card pop-in" style="max-width:520px">
+    <h2 style="text-align:center">🏆 Bảng vàng</h2>
+    <div class="hint" style="text-align:center">Tuần ${weekRange(w)} · chốt sau ${weekLeft()}</div>
+    <div class="honor" id="gHon" hidden></div>
+    <div class="hint" style="margin:6px 0">Ai đạt từ ${EXAM_PASS} điểm ở ít nhất một đề thi HSK được ghi tên. Điểm là trung bình cộng mọi đề đã làm trong tuần. Top 3 cuối tuần nhận danh hiệu và Gem: ${[1,2,3].map(r=>`${TITLES[r][0]} ${TITLES[r][1]} (+${REWARD[r]})`).join(' · ')}.</div>
+    <ul class="lb gold" id="gList"><li class="lbmsg" style="display:block">Đang tải...</li></ul>
+    <div class="btns" style="margin-top:8px;flex-wrap:nowrap"><button class="btn gold" id="gEx" style="flex:1 1 0">📝 Làm đề thi</button><button class="btn alt" id="gBack" style="flex:1 1 0">Quay lại</button></div>
+  </div>`, true);
+  $('#gBack').onclick=back; $('#gEx').onclick=()=>openExams('hsk1',back);
+  api('GET',null,`?gold=1&me=${encodeURIComponent(save.pid)}`).then(d=>{
+    HONORS=d.honors;
+    const hon=$('#gHon'); if(hon&&d.honors.top.length){ hon.innerHTML=`<div class="ht">Vinh danh tuần trước (${weekRange(d.honors.week)})</div><div class="hl">${honorHTML(d.honors)}</div>`; hon.hidden=false; }
+    const el=$('#gList'); if(!el) return;
+    if(!d.top.length){ el.innerHTML='<li class="lbmsg" style="display:block">Tuần này chưa ai lên Bảng vàng. Làm đề thi HSK đạt từ 180 điểm để là người đầu tiên!</li>'; fitCard(); return; }
+    let html=d.top.slice(0,10).map((r,i)=>`<li class="${r.id===save.pid?'me':''}"><span class="rk">${i+1}</span><span class="nm">${nameT(r.name,r.t)}</span><span class="n">${r.n} đề</span><span class="sc">${r.score}</span></li>`).join('');
+    if(d.me&&d.me.rank>10) html+=`<li class="me"><span class="rk">${d.me.rank}</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n">${d.me.n} đề</span><span class="sc">${d.me.score}</span></li>`;
+    el.innerHTML=html; fitCard();
+  }).catch(()=>{ const el=$('#gList'); if(el) el.innerHTML='<li class="lbmsg" style="display:block">Bảng vàng chạy trên bản web xingxing-two.vercel.app. Kiểm tra mạng rồi thử lại nhé.</li>'; });
+}
+
 function verdict(win,wrong,total,next){
   const dumb=total>0 && wrong/total>0.5;
   const kind=dumb?'dumb':win?'good':'meh';
