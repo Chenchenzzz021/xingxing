@@ -164,6 +164,11 @@ button{font-family:inherit;color:inherit}
 .pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px;font-weight:800}
 .pager .btn{padding:4px 14px;font-size:18px;min-width:52px}
 .pager .btn:disabled{opacity:.35}
+.tutdots{display:flex;gap:6px;justify-content:center;margin-bottom:6px}
+.tutdots i{width:9px;height:9px;border-radius:50%;background:rgba(42,35,32,.2)}.tutdots i.on{background:var(--hen-red);width:22px;border-radius:6px}
+.tuthead{display:flex;align-items:center;gap:10px}.tuthead .vchk{width:76px;flex:none}.tuthead h2{margin:0;font-size:22px}
+.tutb{font-size:15px;line-height:1.45;margin-top:6px}
+.tl{margin:6px 0 10px;padding-left:20px}.tl li{margin:3px 0}
 .btn.gold{background:#ffcf3f;color:var(--ink)}
 .ttl{font-size:.95em}
 .honor{margin-top:8px;border:3px solid var(--ink);border-radius:14px;background:linear-gradient(#fff6cf,#ffe58a);padding:6px 10px;text-align:center}
@@ -424,7 +429,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 12;
+const VERSION = 13;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -1039,12 +1044,13 @@ function menu(){
     <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn" id="playBtn" style="flex:2 1 0;font-size:21px;line-height:1.05">Bảo vệ thành!<small id="playSt" style="display:block;font-size:13px;opacity:.85"></small></button><div style="flex:1 1 0;display:flex;flex-direction:column;gap:6px;min-width:0"><button class="btn blue" id="boardBtn" style="flex:none;font-size:15px;padding:5px 4px">Xếp hạng</button><button class="btn alt" id="dictBtn" style="flex:none;font-size:15px;padding:5px 4px">${save.dict[save.set.lv]?'':'🔒 '}Từ điển</button></div></div>
     <div class="btns" style="margin-top:8px;flex-wrap:nowrap"><button class="btn gold" id="examBtn" style="flex:1 1 0;font-size:16px;padding:6px 4px">📝 Đề thi HSK</button><button class="btn gold" id="goldBtn" style="flex:1 1 0;font-size:16px;padding:6px 4px">🏆 Bảng vàng</button></div>
     <div class="honor" id="honorLine" hidden></div>
-    <div class="verline">Xingxing · Phiên bản ${VERSION}</div>
+    <div class="verline">Xingxing · Phiên bản ${VERSION} · <a href="#" id="tutLink">Hướng dẫn</a></div>
   </div>`);
   const mh=()=>{const m=MODES[save.set.mode]; $('#modeHint').textContent=`${m.per===1?'1 gà mỗi lượt':'Tối đa '+m.per+' gà cùng lúc'} · ${m.dur} giây tới tường · ${m.total} gà · tường chịu 3 lần húc`};
   mh();
   const ps=()=>{const L=LEVELS.find(l=>l.id===save.set.lv); $('#playSt').textContent=lvName(L)+' · Màn '+stageOf(L)+'/'+L.stages;}; ps();
   $('#dictBtn').onclick=()=>openDict(save.set.lv,menu);
+  $('#tutLink').onclick=e=>{e.preventDefault(); showTutorial(0,menu);};
   ovl.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{save.set.lang=b.dataset.lang; save.set.lv=LEVELS.find(l=>l.lang===save.set.lang).id; persist(); menu()});
   ovl.querySelectorAll('.lv').forEach(b=>b.onclick=()=>{save.set.lv=b.dataset.lv; persist(); ovl.querySelectorAll('.lv').forEach(x=>x.setAttribute('aria-pressed',x===b)); ps(); $('#dictBtn').textContent=(save.dict[save.set.lv]?'':'🔒 ')+'Từ điển';});
   ovl.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{save.set.mode=b.dataset.mode; persist(); ovl.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',x===b)); mh()});
@@ -1080,7 +1086,7 @@ function askName(back){
     save.name=v; persist();
     if(!first) api('POST',{action:'rename',id:save.pid,name:v}).catch(()=>{});
     else bindDevice(back);
-    back();
+    if(first&&!save.tut) showTutorial(0,back); else back();
   };
   $('#nmBack').onclick=back;
 }
@@ -1450,6 +1456,32 @@ function openGold(back){
   }).catch(()=>{ const el=$('#gList'); if(el) el.innerHTML='<li class="lbmsg" style="display:block">Bảng vàng chạy trên bản web xingxing-two.vercel.app. Kiểm tra mạng rồi thử lại nhé.</li>'; });
 }
 
+/* First-time tutorial, shown once after the account is created (and from the menu link) */
+const TUT=[
+  {t:'Bật âm thanh nhé! 🔊',look:{body:'#ffd84a',wing:'#f5bf1c',hat:'none',weapon:'none',chick:true},
+   b:`Xingxing đọc to từng từ để bạn học phát âm. Trước khi chơi hãy:<ul class="tl"><li>Tắt chế độ <b>im lặng</b> (iPhone: gạt công tắc bên hông máy).</li><li>Tăng <b>âm lượng</b> điện thoại.</li><li>Giữ ô <b>Âm thanh</b> ở menu được bật.</li></ul><button class="btn blue" id="tutTest" style="width:100%">🔊 Bấm để thử nghe: 你好 (nǐ hǎo)</button><div class="hint" id="tutHeard" style="margin-top:6px;text-align:center"></div>`},
+  {t:'Chạm vào gà để trả lời',look:{body:'#fff6e3',wing:'#f1dfbb',hat:'viking',weapon:'axe'},
+   b:`Gà mang từ vựng chạy về phía tường thành. <b>Chạm vào gà</b> để hiện câu hỏi: nghĩa, pinyin, hoặc gõ pinyin.<ul class="tl"><li>Trả lời <b>đúng</b>: pháo bắn hạ gà, bạn được điểm.</li><li>Trả lời <b>sai</b> hoặc để gà chạy tới: gà húc tường. Tường bị húc 4 lần là thua.</li></ul>`},
+  {t:'Điểm và Gem 💎',look:{body:'#d79b5d',wing:'#bf8045',hat:'helmet',weapon:'shovel'},
+   b:`<ul class="tl"><li>Trả lời nhanh, đúng thanh điệu, đúng liên tiếp được thêm điểm. Cấp càng cao điểm càng nhiều.</li><li>Nút 🔊 trong câu hỏi giúp nghe lại từ, nhưng bị trừ ${LISTEN_COST} điểm.</li><li>Mỗi câu đúng được 1 Gem. Dùng Gem mua <b>Gợi ý</b>, <b>+10 giây</b>, mở <b>Từ điển</b> và mua <b>Đề thi HSK</b>.</li></ul>`},
+  {t:'Màn chơi và thi HSK 🏆',look:{body:'#ffd84a',wing:'#f5bf1c',hat:'crown',weapon:'sword',chick:true},
+   b:`<ul class="tl"><li>Mỗi cấp độ có 15–60 màn. Thắng thì bấm <b>Chơi tiếp</b> để sang màn sau, từ đã gặp không lặp lại.</li><li>Mỗi tuần có 3 đề thi HSK mỗi cấp. Đạt từ ${EXAM_PASS} điểm được lên <b>Bảng vàng</b>, top 3 nhận danh hiệu và Gem.</li><li>Mỗi thiết bị chỉ dùng một tài khoản.</li></ul>`},
+];
+function showTutorial(i,done){
+  const T=TUT[i], last=i===TUT.length-1;
+  showOverlay(`<div class="card pop-in tut" style="max-width:440px">
+    <div class="tutdots">${TUT.map((_,j)=>`<i class="${j===i?'on':''}"></i>`).join('')}</div>
+    <div class="tuthead"><div class="vchk">${chickenSVG(T.look)}</div><h2>${T.t}</h2></div>
+    <div class="tutb">${T.b}</div>
+    <div class="btns" style="margin-top:12px;flex-wrap:nowrap">${i>0?'<button class="btn alt" id="tutPrev" style="flex:1 1 0">‹ Trước</button>':'<button class="btn alt" id="tutSkip" style="flex:1 1 0">Bỏ qua</button>'}<button class="btn" id="tutNext" style="flex:2 1 0">${last?'Chơi thử ngay!':'Tiếp ›'}</button></div>
+  </div>`);
+  const finish=()=>{ save.tut=1; persist(); done(); };
+  if($('#tutTest')) $('#tutTest').onclick=()=>{ save.set.sound=true; persist(); ac(); SFX.cluck(); speak('你好','zh'); $('#tutHeard').textContent='Nếu không nghe thấy tiếng, kiểm tra lại công tắc im lặng và âm lượng nhé.'; fitCard(); };
+  if($('#tutPrev')) $('#tutPrev').onclick=()=>showTutorial(i-1,done);
+  if($('#tutSkip')) $('#tutSkip').onclick=finish;
+  $('#tutNext').onclick=()=>{ if(!last) return showTutorial(i+1,done);
+    save.tut=1; persist(); ac(); startGame(); };
+}
 function verdict(win,wrong,total,next){
   const dumb=total>0 && wrong/total>0.5;
   const kind=dumb?'dumb':win?'good':'meh';
