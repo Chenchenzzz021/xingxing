@@ -80,6 +80,8 @@ const key = (b) => 'xx:lb:' + b;
 // Golden boards are separate: HSK (Chinese) keeps the original keys, TOEIC (English) adds "En".
 const sfx = (lang) => (lang === 'en' ? 'En' : '');
 const gold = (w, lang = 'zh') => 'xx:gold' + sfx(lang) + ':' + w;
+// Pass marks: HSK 1–2 papers are /200 (pass 120), HSK 3+ /300 (pass 180), TOEIC 450/990
+const passOf = (lv) => (lv.startsWith('en') ? 450 : lv === 'hsk1' || lv === 'hsk2' ? 120 : 180);
 const ZH_COEF = { hsk1: 1, hsk2: 1, hsk3: 2, hsk4: 2, hsk5: 3, hsk6: 3, hsk7: 4 };
 const EXAM = { zh: { max: 300, pass: 180 }, en: { max: 990, pass: 450 } };
 const langOf = (q) => (q === 'en' ? 'en' : 'zh');
@@ -167,7 +169,7 @@ module.exports = async (req, res) => {
           if (!m || Number(m[1]) !== week || (m[2].startsWith('en') ? 'en' : 'zh') !== lang) continue;
           const score = Number(flat[i + 1]);
           const coef = lang === 'zh' ? ZH_COEF[m[2]] : 1;
-          exams.push({ lv: m[2], no: Number(m[3]) + 1, score, coef, pts: score >= EXAM[lang].pass ? score * coef : 0, pass: score >= EXAM[lang].pass });
+          exams.push({ lv: m[2], no: Number(m[3]) + 1, score, coef, pts: score >= passOf(m[2]) ? score * coef : 0, pass: score >= passOf(m[2]) });
         }
         exams.sort((x, y) => y.pts - x.pts);
         return res.status(200).json({ id, lang, name: shown(name, id), t: titles[id] || 0, score: sc === null ? null : num(sc), rank: rank === null || rank === undefined ? null : rank + 1, exams });
@@ -254,7 +256,7 @@ module.exports = async (req, res) => {
           const e = /^(\d{1,5})-(hsk[1-7]|en[1-3])-([0-2])$/.exec(flat[k]);
           if (!e || Number(e[1]) !== w || (e[2].startsWith('en') ? 'en' : 'zh') !== lang) continue;
           const sc = Number(flat[k + 1]);
-          if (sc < EXAM[lang].pass) continue;
+          if (sc < passOf(e[2])) continue;
           sum += sc * (lang === 'zh' ? ZH_COEF[e[2]] : 1); n++;
         }
         const passed = n > 0;

@@ -203,6 +203,9 @@ button{font-family:inherit;color:inherit}
 .exc .btn:disabled{opacity:.45}
 .opt.hz{font-family:var(--han);font-size:24px;justify-content:flex-start}
 .opt.pick{background:#dfe9ff;border-color:var(--royal2)}
+.opts.tf{grid-template-columns:1fr 1fr}
+.w.tfshow{font-size:clamp(20px,5vw,30px)}
+.w.py{font-family:'Noto Sans',system-ui,sans-serif;font-weight:700;color:var(--royal)}
 .exam .clock{font-variant-numeric:tabular-nums}.exam .clock.low{color:var(--bad)}
 .say.big{width:76px;height:76px}.say.big svg{width:36px;height:36px}
 .exscore{font-weight:800;font-size:64px;line-height:1;margin:8px 0}.exscore small{font-size:22px;opacity:.6}
@@ -499,7 +502,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 28;
+const VERSION = 29;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,hsk7:3,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -508,6 +511,23 @@ const DICT_PRICE = {hsk1:10,hsk2:15,hsk3:25,hsk4:35,hsk5:50,hsk6:70,hsk7:90,en1:
 const EXAM_PRICE = {hsk1:5,hsk2:8,hsk3:12,hsk4:18,hsk5:25,hsk6:30,hsk7:40,en1:5,en2:12,en3:25};
 const EXAM_Q = {hsk1:20,hsk2:25,hsk3:30,hsk4:30,hsk5:35,hsk6:40,hsk7:45,en1:30,en2:40,en3:50};
 const EXAM_SEC = 18, EXAM_MAX = 300, EXAM_PASS = 180;
+// HSK exams follow the real format, shortened to fit 35 minutes:
+// Nghe (听力) + Đọc (阅读) for HSK 1–2 (200 points, pass 120); + Viết (书写) from HSK 3 (300 points, pass 180).
+// Each part is scored out of 100.
+const HSK_SPEC = {
+  hsk1:{min:15,parts:{L:10,R:10}},
+  hsk2:{min:20,parts:{L:15,R:15}},
+  hsk3:{min:25,parts:{L:12,R:12,W:8}},
+  hsk4:{min:30,parts:{L:14,R:14,W:8}},
+  hsk5:{min:35,parts:{L:15,R:16,W:9}},
+  hsk6:{min:35,parts:{L:15,R:16,W:9}},
+  hsk7:{min:35,parts:{L:15,R:16,W:9}},
+};
+const PART_NAME={L:'🎧 Nghe',R:'📖 Đọc',W:'✍️ Viết'};
+const examMax=lv=>lv.startsWith('en')?TOEIC_MAX:Object.keys(HSK_SPEC[lv].parts).length*100;
+const examPass=lv=>lv.startsWith('en')?TOEIC_PASS:(examMax(lv)===200?120:180);
+const examN=lv=>lv.startsWith('en')?EXAM_Q[lv]:Object.values(HSK_SPEC[lv].parts).reduce((a,b)=>a+b,0);
+const examMin=lv=>lv.startsWith('en')?Math.round(EXAM_Q[lv]*TOEIC_SEC/60):HSK_SPEC[lv].min;
 // HSK golden board weights harder exams
 const ZH_COEF = {hsk1:1,hsk2:1,hsk3:2,hsk4:2,hsk5:3,hsk6:3,hsk7:4};
 const coefOf = lv => ZH_COEF[lv]||1;
@@ -1450,7 +1470,7 @@ const EXK={
 const exLang=lv=>lv.startsWith('en')?'en':'zh';
 const exName=L=>L.lang==='en'?'TOEIC '+L.name:L.name;
 function buildExam(lv,w,i){
-  const L=LEVELS.find(l=>l.id===lv), N=EXAM_Q[lv], r=rng(seedOf('xx'+w+lv));
+  const L=LEVELS.find(l=>l.id===lv), N=examN(lv), r=rng(seedOf('xx'+w+lv));
   const order=srShuffle(L.words.slice(),r), pick=[];
   for(let j=0;j<N;j++) pick.push(order[(i*N+j)%order.length]);
   const r2=rng(seedOf('q'+w+lv+i));
@@ -1470,17 +1490,37 @@ function buildExam(lv,w,i){
       return Object.assign(q,{k:w0.k,say:w0.en,lang:'en',part});
     });
   }
-  const TYPES=['listen','meaning','reverse','pinyin'];
-  return pick.map((w0,j)=>{
-    const type=TYPES[(j+Math.floor(r2()*4))%4];
+  // HSK: questions grouped by part like the real exam
+  const lvN=+lv.slice(3), low=lvN<=2, spec=HSK_SPEC[lv].parts;
+  const TF=['✓ Đúng','✗ Sai'];
+  const plan=[];
+  for(const [part,n] of Object.entries(spec)) for(let j=0;j<n;j++){
+    let type;
+    if(part==='L') type=low?['tfL','listen','listen','listenM'][j%4]:['listen','listenM','listen','tfL'][j%4];
+    else if(part==='R') type=low?['tfR','meaning','pinyin','reverse'][j%4]:['meaning','reverse','pinyin','meaning'][j%4];
+    else type=j%2?'writeHz':'writePy';
+    plan.push([part,type]);
+  }
+  const hz=w=>low?`${w.h} · ${w.py}`:w.h; // HSK 1–2 papers print pinyin under the characters
+  return pick.slice(0,plan.length).map((w0,j)=>{
+    const [part,type]=plan[j];
     const others=srShuffle(L.words.filter(x=>x.k!==w0.k&&x.m!==w0.m),r2);
     const same=others.filter(o=>o.h.length===w0.h.length);
+    const shared=others.filter(o=>[...o.h].some(c=>w0.h.includes(c)));
     let q;
-    if(type==='listen') q={type,prompt:'Nghe và chọn chữ Hán đúng',show:'',opts:take(w0,x=>x.h,same.concat(others)),ans:w0.h,cls:'hz'};
+    if(type==='tfL'||type==='tfR'){
+      const truth=r2()<0.5, shown=truth?w0.m:others[0].m;
+      q={type:type==='tfL'?'listen':'tf',prompt:type==='tfL'?`Nghe rồi cho biết: từ vừa nghe có nghĩa là “${shown}”?`:'Từ và nghĩa dưới đây có khớp nhau không?',
+         show:type==='tfL'?'':`${hz(w0)} = ${shown}`,showCls:'tfshow',opts:TF.slice(),ans:truth?TF[0]:TF[1],cls:''};
+    }
+    else if(type==='listen') q={type,prompt:'Nghe và chọn từ bạn vừa nghe',show:'',opts:take(w0,hz,same.concat(others)),ans:hz(w0),cls:'hz'};
+    else if(type==='listenM') q={type:'listen',prompt:'Nghe và chọn nghĩa đúng',show:'',opts:take(w0,x=>x.m,others),ans:w0.m,cls:''};
     else if(type==='meaning') q={type,prompt:'Chọn nghĩa đúng của từ này',show:w0.h,showCls:'han',opts:take(w0,x=>x.m,others),ans:w0.m,cls:''};
-    else if(type==='reverse') q={type,prompt:'Chữ Hán nào có nghĩa này?',show:w0.m,showCls:'vi',opts:take(w0,x=>x.h,same.concat(others)),ans:w0.h,cls:'hz'};
-    else q={type,prompt:'Chọn pinyin đúng của từ này',show:w0.h,showCls:'han',opts:take(w0,x=>x.py,toneVariants(w0.py,2).map(p=>({py:p})).concat(same,others)),ans:w0.py,cls:'py'};
-    return Object.assign(q,{k:w0.k,say:w0.h,lang:'zh'});
+    else if(type==='reverse') q={type,prompt:'Từ nào có nghĩa này?',show:w0.m,showCls:'vi',opts:take(w0,hz,shared.concat(same,others)),ans:hz(w0),cls:'hz'};
+    else if(type==='pinyin') q={type,prompt:'Chọn pinyin đúng của từ này',show:w0.h,showCls:'han',opts:take(w0,x=>x.py,toneVariants(w0.py,2).map(p=>({py:p})).concat(same,others)),ans:w0.py,cls:'py'};
+    else if(type==='writeHz') q={type,prompt:`Viết chữ Hán theo pinyin: ${w0.py} (${w0.m})`,show:w0.py,showCls:'py',opts:take(w0,x=>x.h,shared.concat(same,others)),ans:w0.h,cls:'hz'};
+    else q={type:'write',prompt:`Viết pinyin của từ này (${w0.m}). Gõ không dấu cũng được, vd: ni hao`,show:w0.h,showCls:'han',opts:[],ans:w0.py,cls:''};
+    return Object.assign(q,{k:w0.k,say:w0.h,lang:'zh',part});
   });
 }
 // TOEIC: each part 5–495, total 10–990. HSK: out of 300.
@@ -1490,16 +1530,21 @@ function scoreRun(R){
     const L=5+Math.round((R.okL||0)/nL*490), Rd=5+Math.round((R.okR||0)/nR*490);
     return {score:L+Rd,L,R:Rd};
   }
-  return {score:Math.round(R.ok/R.qs.length*EXAM_MAX)};
+  // HSK: every part out of 100
+  const P={}, out={};
+  for(const q of R.qs) P[q.part]=(P[q.part]||0)+1;
+  let score=0;
+  for(const k of Object.keys(P)){ const v=Math.round(((R.okP||{})[k]||0)/P[k]*100); out[k]=v; score+=v; }
+  return {score,parts:out};
 }
 function examResult(id){ return save.exams[id]; }
 function openExams(lv,back){
-  const w=weekId(), L=LEVELS.find(l=>l.id===lv)||LEVELS[0], K=EXK[L.lang], price=EXAM_PRICE[L.id], N=EXAM_Q[L.id];
+  const w=weekId(), L=LEVELS.find(l=>l.id===lv)||LEVELS[0], K=EXK[L.lang], price=EXAM_PRICE[L.id], N=examN(L.id), MX0=examMax(L.id), PS0=examPass(L.id), MX=MX0, PS=PS0;
   const cards=[0,1,2].map(i=>{
-    const id=examId(w,L.id,i), r=examResult(id);
+    const id=examId(w,L.id,i), r=examResult(id), old=r&&L.lang==='zh'&&!r.parts, MX=old?300:MX0, PS=old?180:PS0; // pre-v29 HSK results were /300
     return `<div class="exc ${r?'done':''}"><div class="t">Đề ${i+1}</div>
-      ${r?`<div class="sc ${r.score>=K.pass?'ok':'no'}">${r.score}<small>/${K.max}</small></div><div class="st">${r.score>=K.pass?'Đạt':'Chưa đạt'}</div>`
-         :`<div class="st">${N} câu · ${Math.round(N*K.sec/60)} phút</div><button class="btn" data-ex="${i}" ${save.gems<price?'disabled':''}>${GEM} ${price}</button>`}</div>`;
+      ${r?`<div class="sc ${r.score>=PS?'ok':'no'}">${r.score}<small>/${MX}</small></div><div class="st">${r.score>=PS?'Đạt':'Chưa đạt'}</div>`
+         :`<div class="st">${N} câu · ${examMin(L.id)} phút</div><button class="btn" data-ex="${i}" ${save.gems<price?'disabled':''}>${GEM} ${price}</button>`}</div>`;
   }).join('');
   showOverlay(`<div class="card pop-in" style="max-width:520px">
     <h2 style="text-align:center">📝 Đề thi ${K.name}</h2>
@@ -1510,7 +1555,7 @@ function openExams(lv,back){
     <div class="dlv">${K.levels().map(l=>`<button data-xl="${l.id}" aria-pressed="${l.id===L.id}">${l.name}</button>`).join('')}</div>
     <div class="hint" style="text-align:center">Tuần ${weekRange(w)} · đổi đề sau ${weekLeft()}</div>
     <div class="excs">${cards}</div>
-    <div class="hint" style="margin-top:8px">${L.lang==='en'?`Đề TOEIC 2 kỹ năng: phần <b>Nghe</b> (Listening) và phần <b>Đọc</b> (Reading), mỗi phần 5–495 điểm, tổng ${TOEIC_MAX}.`:`Thang điểm ${EXAM_MAX}, hệ số Bảng vàng <b>×${coefOf(L.id)}</b>.`} Mỗi đề chỉ được làm <b>một lần</b>. Đạt từ <b>${K.pass}</b> điểm sẽ được ghi tên lên 🏆 Bảng vàng ${K.name} tuần này. Bạn đang có ${GEM} ${save.gems}.</div>
+    <div class="hint" style="margin-top:8px">${L.lang==='en'?`Đề TOEIC 2 kỹ năng: phần <b>Nghe</b> (Listening) và phần <b>Đọc</b> (Reading), mỗi phần 5–495 điểm, tổng ${TOEIC_MAX}.`:`Đề ${L.name} gồm ${Object.keys(HSK_SPEC[L.id].parts).map(k=>PART_NAME[k]).join(', ')}, mỗi phần 100 điểm, tổng ${MX}, đạt từ ${PS}. Hệ số Bảng vàng <b>×${coefOf(L.id)}</b>.`} Mỗi đề chỉ được làm <b>một lần</b>. Đạt từ <b>${PS}</b> điểm sẽ được ghi tên lên 🏆 Bảng vàng ${K.name} tuần này. Bạn đang có ${GEM} ${save.gems}.</div>
     <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn gold" id="xGold" style="flex:1 1 0">🏆 Bảng vàng ${K.name}</button><button class="btn alt" id="xBack" style="flex:1 1 0">Quay lại</button></div>
   </div>`);
   ovl.querySelectorAll('[data-xl]').forEach(b=>b.onclick=()=>openExams(b.dataset.xl,back));
@@ -1520,11 +1565,13 @@ function openExams(lv,back){
   $('#xBack').onclick=back;
 }
 function confirmExam(lv,i,back){
-  const L=LEVELS.find(l=>l.id===lv), K=EXK[L.lang], price=EXAM_PRICE[lv], N=EXAM_Q[lv];
-  const kinds=L.lang==='en'?`Phần Nghe: nghe từ rồi chọn từ đúng hoặc nghĩa đúng. Phần Đọc: chọn nghĩa, chọn từ tiếng Anh.`:`nghe chọn chữ, chọn nghĩa, chọn chữ Hán, chọn pinyin.`;
+  const L=LEVELS.find(l=>l.id===lv), K=EXK[L.lang], price=EXAM_PRICE[lv], N=examN(lv);
+  const sp=L.lang==='zh'&&HSK_SPEC[lv].parts;
+  const kinds=L.lang==='en'?`Phần Nghe: nghe từ rồi chọn từ đúng hoặc nghĩa đúng. Phần Đọc: chọn nghĩa, chọn từ tiếng Anh.`
+    :`${PART_NAME.L} ${sp.L} câu: nghe rồi chọn từ, chọn nghĩa${+lv.slice(3)<=2?', phán đoán đúng/sai':''}. ${PART_NAME.R} ${sp.R} câu: chọn nghĩa, chọn từ, chọn pinyin.${sp.W?` ${PART_NAME.W} ${sp.W} câu: viết chữ Hán theo pinyin, gõ pinyin.`:''}`;
   showOverlay(`<div class="card pop-in" style="max-width:420px;text-align:center">
     <h2>Đề ${i+1} · ${exName(L)}</h2>
-    <div class="hint" style="margin:8px 0">${N} câu trắc nghiệm. ${kinds} Thời gian ${Math.round(N*K.sec/60)} phút, hết giờ tự nộp bài.${L.lang==='en'?' Nhớ bật âm thanh cho phần Nghe.':''}</div>
+    <div class="hint" style="margin:8px 0;text-align:left">${N} câu. ${kinds} Thời gian <b>${examMin(lv)} phút</b> cho cả bài, hết giờ tự nộp bài. Thang điểm ${examMax(lv)}, đạt từ ${examPass(lv)}. Nhớ bật âm thanh cho phần Nghe.</div>
     <div class="hint"><b>Chỉ được làm một lần.</b> Thoát giữa chừng cũng tính là đã nộp bài.</div>
     <div class="gembar">Giá: ${price} ${GEM} <span style="opacity:.6;font-weight:600">(đang có ${save.gems})</span></div>
     <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn" id="xGo" style="flex:2 1 0">Mua và làm bài</button><button class="btn alt" id="xNo" style="flex:1 1 0">Thôi</button></div>
@@ -1535,7 +1582,7 @@ function confirmExam(lv,i,back){
     if(save.exams[id]) return openExams(lv,back);
     if(!spend(price)) return;
     save.set.sound=true;
-    save.examRun={id,lv,i,qs:buildExam(lv,w,i),n:0,ok:0,okL:0,okR:0,end:Date.now()+N*K.sec*1000}; persist();
+    save.examRun={id,lv,i,qs:buildExam(lv,w,i),n:0,ok:0,okL:0,okR:0,okP:{},end:Date.now()+examMin(lv)*60000}; persist();
     examQ(back);
   };
 }
@@ -1544,25 +1591,29 @@ function examQ(back){
   const R=save.examRun; if(!R) return back();
   if(R.n>=R.qs.length||Date.now()>=R.end) return finishExam(back);
   const q=R.qs[R.n], L=LEVELS.find(l=>l.id===R.lv);
-  const partTag=q.part?`<span class="part">${q.part==='L'?'🎧 Nghe':'📖 Đọc'}</span>`:'';
+  const partTag=q.part?`<span class="part">${PART_NAME[q.part]}</span>`:'';
   showOverlay(`<div class="card pop-in exam" style="max-width:520px" role="dialog" aria-label="Bài thi">
     <div class="qhead"><span class="pill">Câu ${R.n+1}/${R.qs.length}</span>${partTag}<span>${exName(L)} · Đề ${R.i+1}</span><span class="clock" id="xClock"></span></div>
     <div class="word">${q.type==='listen'?`<button class="say listen big" id="xSay" aria-label="Nghe lại">${SPK}</button>`:`<div class="w ${q.showCls}">${esc(q.show)}</div>`}</div>
     <div class="prompt">${esc(q.prompt)}</div>
-    <div class="opts ${q.opts.some(o=>o.length>22)?'one':''}">${q.opts.map((o,j)=>`<button class="opt ${q.cls}" data-v="${esc(o)}"><span class="k">${j+1}</span><span>${esc(o)}</span></button>`).join('')}</div>
+    ${q.type==='write'?`<form class="typein" id="xForm" autocomplete="off"><input id="xIn" class="py-t" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="gõ pinyin" aria-label="Pinyin"><button class="btn blue" type="submit">Trả lời</button></form>`
+      :`<div class="opts ${q.opts.length===2?'tf':''} ${q.opts.some(o=>o.length>22)?'one':''}">${q.opts.map((o,j)=>`<button class="opt ${q.cls}" data-v="${esc(o)}"><span class="k">${j+1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}
     <div class="btns" style="margin-top:10px"><button class="btn alt" id="xQuit" style="font-size:16px;padding:6px 14px">Nộp bài sớm</button></div>
   </div>`);
   if(q.type==='listen'){ const say=()=>speak(q.say,q.lang||'zh'); $('#xSay').onclick=say; setTimeout(say,250); }
   const tick=()=>{ const left=Math.max(0,R.end-Date.now()), el=$('#xClock'); if(el){ el.textContent='⏱ '+Math.floor(left/60000)+':'+String(Math.floor(left%60000/1000)).padStart(2,'0'); el.classList.toggle('low',left<60000); } if(left<=0){ clearInterval(examTimer); finishExam(back); } };
   clearInterval(examTimer); examTimer=setInterval(tick,500); tick();
   let picked=false;
-  ovl.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+  const answer=(ok,b)=>{
     if(picked) return; picked=true;
-    const ok=b.dataset.v===q.ans; if(ok){ R.ok++; if(q.part==='L') R.okL=(R.okL||0)+1; else if(q.part==='R') R.okR=(R.okR||0)+1; } R.n++;
+    if(ok){ R.ok++; if(q.part==='L') R.okL=(R.okL||0)+1; else if(q.part==='R') R.okR=(R.okR||0)+1; R.okP=R.okP||{}; R.okP[q.part]=(R.okP[q.part]||0)+1; } R.n++;
     const L2=LEVELS.find(l=>l.id===R.lv), w=L2.words.find(x=>x.k===q.k); if(w) learn(L2,w);
-    persist(); b.classList.add('pick'); SFX.open();
+    persist(); if(b) b.classList.add('pick'); SFX.open();
     setTimeout(()=>examQ(back),180);
-  });
+  };
+  ovl.querySelectorAll('.opt').forEach(b=>b.onclick=()=>answer(b.dataset.v===q.ans,b));
+  if(q.type==='write'){ const inp=$('#xIn'); setTimeout(()=>{try{inp.focus({preventScroll:true})}catch(e){}},60);
+    $('#xForm').onsubmit=e=>{ e.preventDefault(); const v=inp.value.trim(); if(!v) return; answer(baseLetters(v)===baseLetters(q.ans)); }; }
   // two taps to hand in early (window.confirm is blocked inside some embeds)
   $('#xQuit').onclick=e=>{ const t=e.currentTarget; if(t.dataset.sure){ finishExam(back); return; } t.dataset.sure=1; t.textContent='Bấm lần nữa để nộp (câu chưa làm tính sai)'; t.classList.remove('alt'); };
 }
@@ -1571,14 +1622,15 @@ function finishExam(back){
   const R=save.examRun; if(!R) return back();
   const total=R.qs.length, sc=scoreRun(R), score=sc.score;
   save.exams[R.id]=Object.assign({ok:R.ok,total,at:Date.now()},sc); delete save.examRun;
-  const L=LEVELS.find(l=>l.id===R.lv), K=EXK[L.lang], pass=score>=K.pass;
+  const L=LEVELS.find(l=>l.id===R.lv), K=EXK[L.lang], PS=examPass(L.id), pass=score>=PS;
   const entry={type:'exam',exam:R.id,score};
   persist(); pass?SFX.win():SFX.lose();
   showOverlay(`<div class="card pop-in" style="max-width:440px;text-align:center">
     <h2>Kết quả Đề ${R.i+1} · ${exName(L)}</h2>
-    <div class="exscore ${pass?'ok':'no'}">${score}<small>/${K.max}</small></div>
+    <div class="exscore ${pass?'ok':'no'}">${score}<small>/${examMax(L.id)}</small></div>
     ${sc.L!=null?`<div class="stat"><span>🎧 Nghe ${sc.L}/495</span><span>📖 Đọc ${sc.R}/495</span></div>`:''}
-    <div class="gembar">${pass?`🎉 Đạt! Bạn đủ điều kiện lên Bảng vàng ${K.name}`:'Chưa đạt, cần từ '+K.pass+' điểm'}</div>
+    ${sc.parts?`<div class="stat">${Object.entries(sc.parts).map(([k,v])=>`<span>${PART_NAME[k]} ${v}/100</span>`).join('')}</div>`:''}
+    <div class="gembar">${pass?`🎉 Đạt! Bạn đủ điều kiện lên Bảng vàng ${K.name}`:'Chưa đạt, cần từ '+PS+' điểm'}</div>
     ${L.lang==='zh'&&pass?`<div class="hint" style="text-align:center">Điểm tính Bảng vàng: ${score} × hệ số ${coefOf(L.id)} = <b>${score*coefOf(L.id)}</b></div>`:''}
     <div class="hint">Đúng ${R.ok}/${total} câu. Các từ trong đề đã được thêm vào Từ điển ${esc(lvName(L))}.</div>
     <div id="xSub" class="subline"></div>
@@ -1589,7 +1641,7 @@ function finishExam(back){
   if(!save.name){ save.pending.push(entry); persist(); box.textContent='Nhập tên tài khoản ở menu để gửi điểm lên Bảng vàng.'; return; }
   box.textContent='Đang gửi điểm lên Bảng vàng...';
   submitExam(entry).then(d=>{
-    box.innerHTML=d.rank?`Bạn đang đứng hạng <b>#${d.rank}</b> trên Bảng vàng ${K.name} tuần này, tổng điểm <b>${d.sum}</b> từ ${d.n} đề đạt.${pass?'':` Đề này chưa đạt ${K.pass} nên không được cộng.`}`:`Đề này chưa đạt ${K.pass} điểm nên không được cộng vào Bảng vàng. Đạt một đề từ ${K.pass} điểm để lên bảng.`;
+    box.innerHTML=d.rank?`Bạn đang đứng hạng <b>#${d.rank}</b> trên Bảng vàng ${K.name} tuần này, tổng điểm <b>${d.sum}</b> từ ${d.n} đề đạt.${pass?'':` Đề này chưa đạt ${PS} nên không được cộng.`}`:`Đề này chưa đạt ${PS} điểm nên không được cộng vào Bảng vàng. Đạt một đề từ ${PS} điểm để lên bảng.`;
     fitCard();
   }).catch(()=>{ save.pending.push(entry); persist(); box.textContent='Chưa gửi được điểm, game sẽ tự gửi lại lần sau.'; fitCard(); });
 }
@@ -1641,7 +1693,7 @@ function openGold(lang,back){
     </div>
     <div class="hint" style="text-align:center">Tuần ${weekRange(w)} · chốt sau ${weekLeft()}</div>
     <div class="honor" id="gHon" hidden></div>
-    <div class="hint" style="margin:6px 0">Ai đạt từ ${K.pass}/${K.max} điểm ở ít nhất một đề thi ${K.name} được ghi tên. Điểm là <b>tổng điểm</b> các đề ${K.name} <b>đạt</b> trong tuần (đề chưa đạt không được cộng)${lang==='zh'?', mỗi đề nhân hệ số theo cấp: <b>HSK1–2 ×1, HSK3–4 ×2, HSK5–6 ×3, HSK7–9 ×4</b>':''}. Top 3 cuối tuần nhận danh hiệu và Gem: ${[1,2,3].map(r=>`${TITLES[r][0]} +${REWARD[r]}`).join(' · ')}.</div>
+    <div class="hint" style="margin:6px 0">Ai đạt ${lang==='en'?`từ ${K.pass}/${K.max}`:'mức đạt (HSK 1–2: 120/200, HSK 3 trở lên: 180/300)'} ở ít nhất một đề thi ${K.name} được ghi tên. Điểm là <b>tổng điểm</b> các đề ${K.name} <b>đạt</b> trong tuần (đề chưa đạt không được cộng)${lang==='zh'?', mỗi đề nhân hệ số theo cấp: <b>HSK1–2 ×1, HSK3–4 ×2, HSK5–6 ×3, HSK7–9 ×4</b>':''}. Top 3 cuối tuần nhận danh hiệu và Gem: ${[1,2,3].map(r=>`${TITLES[r][0]} +${REWARD[r]}`).join(' · ')}.</div>
     <ul class="lb gold" id="gList"><li class="lbmsg" style="display:block">Đang tải...</li></ul>
     <div class="btns" style="margin-top:8px;flex-wrap:nowrap"><button class="btn gold" id="gEx" style="flex:1 1 0">📝 Làm đề ${K.name}</button><button class="btn alt" id="gBack" style="flex:1 1 0">Quay lại</button></div>
   </div>`, true);
@@ -1651,7 +1703,7 @@ function openGold(lang,back){
     HONORS[lang]=d.honors; if(d.other) HONORS[lang==='en'?'zh':'en']=d.other;
     const hon=$('#gHon'); if(hon&&d.honors.top.length){ hon.innerHTML=`<div class="ht">Vinh danh tuần trước (${weekRange(d.honors.week)})</div><div class="hl">${honorHTML(d.honors)}</div>`; hon.hidden=false; }
     const el=$('#gList'); if(!el) return;
-    if(!d.top.length){ el.innerHTML=`<li class="lbmsg" style="display:block">Tuần này chưa ai lên Bảng vàng ${K.name}. Làm đề đạt từ ${K.pass} điểm để là người đầu tiên!</li>`; fitCard(); return; }
+    if(!d.top.length){ el.innerHTML=`<li class="lbmsg" style="display:block">Tuần này chưa ai lên Bảng vàng ${K.name}. Làm đề đạt ${lang==='en'?'từ '+K.pass+' điểm':'mức đạt'} để là người đầu tiên!</li>`; fitCard(); return; }
     let html=d.top.slice(0,10).map((r,i)=>`<li class="${r.id===save.pid?'me':''}" data-pid="${esc(r.id)}"><span class="rk">${i+1}</span><span class="nm">${nameT(r.name,r.t)}</span><span class="n">${r.n} đề</span><span class="sc">${r.score}</span><span class="go">›</span></li>`).join('');
     if(d.me&&d.me.rank>10) html+=`<li class="me" data-pid="${esc(save.pid)}"><span class="rk">${d.me.rank}</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n">${d.me.n} đề</span><span class="sc">${d.me.score}</span><span class="go">›</span></li>`;
     else if(!d.me) html+=`<li class="me"><span class="rk">–</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n" style="flex:1 1 auto;text-align:right">chưa lên bảng</span></li>`;
@@ -1694,7 +1746,7 @@ const TUT=[
   {t:'Điểm và Gem 💎',look:{body:'#d79b5d',wing:'#bf8045',hat:'helmet',weapon:'shovel'},
    b:`<ul class="tl"><li>Đồng hồ <b>⚡ Tốc độ</b> chạy ngay khi bạn chạm vào gà: trả lời <b>càng nhanh càng nhiều điểm</b>. Đúng thanh điệu, đúng liên tiếp cũng được thêm điểm. Cấp càng cao điểm càng nhiều.</li><li>Nút 🔊 trong câu hỏi giúp nghe lại từ, nhưng bị trừ ${LISTEN_COST} điểm.</li><li>Mỗi câu đúng được 1 Gem. Dùng Gem mua <b>Gợi ý</b>, <b>+10 giây</b>, mở <b>Từ điển</b> và mua <b>Đề thi HSK</b>.</li></ul>`},
   {t:'Màn chơi và thi HSK 🏆',look:{body:'#ffd84a',wing:'#f5bf1c',hat:'crown',weapon:'sword',chick:true},
-   b:`<ul class="tl"><li>Mỗi cấp độ có 15–60 màn. Thắng thì bấm <b>Chơi tiếp</b> để sang màn sau, từ đã gặp không lặp lại.</li><li>Mỗi tuần có 3 đề thi mỗi cấp: <b>HSK</b> cho tiếng Trung (đạt từ ${EXAM_PASS}/${EXAM_MAX}) và <b>TOEIC</b> Nghe + Đọc cho tiếng Anh (đạt từ ${TOEIC_PASS}/${TOEIC_MAX}). Đạt thì được lên <b>Bảng vàng</b> riêng của mỗi loại, top 3 nhận danh hiệu và Gem.</li><li>Mỗi thiết bị chỉ dùng một tài khoản.</li></ul>`},
+   b:`<ul class="tl"><li>Mỗi cấp độ có 15–60 màn. Thắng thì bấm <b>Chơi tiếp</b> để sang màn sau, từ đã gặp không lặp lại.</li><li>Mỗi tuần có 3 đề thi mỗi cấp: <b>HSK</b> cho tiếng Trung (Nghe, Đọc, Viết như đề thật, tối đa 35 phút) và <b>TOEIC</b> Nghe + Đọc cho tiếng Anh (đạt từ ${TOEIC_PASS}/${TOEIC_MAX}). Đạt thì được lên <b>Bảng vàng</b> riêng của mỗi loại, top 3 nhận danh hiệu và Gem.</li><li>Mỗi thiết bị chỉ dùng một tài khoản.</li></ul>`},
 ];
 function showTutorial(i,done){
   const T=TUT[i], last=i===TUT.length-1;
