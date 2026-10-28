@@ -80,6 +80,7 @@ const key = (b) => 'xx:lb:' + b;
 // Golden boards are separate: HSK (Chinese) keeps the original keys, TOEIC (English) adds "En".
 const sfx = (lang) => (lang === 'en' ? 'En' : '');
 const gold = (w, lang = 'zh') => 'xx:gold' + sfx(lang) + ':' + w;
+const ZH_COEF = { hsk1: 1, hsk2: 1, hsk3: 2, hsk4: 2, hsk5: 3, hsk6: 3 };
 const EXAM = { zh: { max: 300, pass: 180 }, en: { max: 990, pass: 600 } };
 const langOf = (q) => (q === 'en' ? 'en' : 'zh');
 const validId = (s) => typeof s === 'string' && /^[a-z0-9]{6,32}$/.test(s);
@@ -223,8 +224,10 @@ module.exports = async (req, res) => {
         const [fresh] = await redis([['HSETNX', 'xx:exams:' + b.id, b.exam, String(score)]]);
         await redis([['HSET', 'xx:names', b.id, name]]);
         if (!fresh) return res.status(200).json({ ok: true, dup: true });
+        // HSK board weights harder exams: HSK1-2 ×1, HSK3-4 ×2, HSK5-6 ×3
+        const coef = lang === 'zh' ? ZH_COEF[m[2]] : 1;
         const cmds = [
-          ['HINCRBY', 'xx:gsum' + sx + ':' + w, b.id, String(score)],
+          ['HINCRBY', 'xx:gsum' + sx + ':' + w, b.id, String(score * coef)],
           ['HINCRBY', 'xx:gcnt' + sx + ':' + w, b.id, '1'],
         ];
         if (score >= EXAM[lang].pass) cmds.push(['SADD', 'xx:gpass' + sx + ':' + w, b.id]);
@@ -239,7 +242,7 @@ module.exports = async (req, res) => {
           const [, r] = await redis([['ZADD', gold(w, lang), String(avg), b.id], ['ZREVRANK', gold(w, lang), b.id]]);
           rank = r + 1;
         }
-        return res.status(200).json({ ok: true, lang, avg, n, passed, rank });
+        return res.status(200).json({ ok: true, lang, avg, n, passed, rank, coef });
       }
 
       if (b.action === 'claim') {

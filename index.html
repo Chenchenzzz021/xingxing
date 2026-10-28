@@ -431,7 +431,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 17;
+const VERSION = 18;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -440,6 +440,9 @@ const DICT_PRICE = {hsk1:10,hsk2:15,hsk3:25,hsk4:35,hsk5:50,hsk6:70,en1:10,en2:2
 const EXAM_PRICE = {hsk1:5,hsk2:8,hsk3:12,hsk4:18,hsk5:25,hsk6:30,en1:5,en2:12,en3:25};
 const EXAM_Q = {hsk1:20,hsk2:25,hsk3:30,hsk4:30,hsk5:35,hsk6:40,en1:30,en2:40,en3:50};
 const EXAM_SEC = 18, EXAM_MAX = 300, EXAM_PASS = 180;
+// HSK golden board weights harder exams
+const ZH_COEF = {hsk1:1,hsk2:1,hsk3:2,hsk4:2,hsk5:3,hsk6:3};
+const coefOf = lv => ZH_COEF[lv]||1;
 // English levels sit a TOEIC-style test (Listening + Reading), scored 10–990; 600+ reaches the TOEIC golden board
 const TOEIC_SEC = 15, TOEIC_MAX = 990, TOEIC_PASS = 600;
 const TITLES = {1:['😎','Thiên hạ vô địch, mấy con gà biết cái gì'],2:['🙇','Trên vạn người, dưới mỗi người bên trên'],3:['🤓','Top 3 chứng tỏ giỏi hơn người ta']};
@@ -1385,7 +1388,7 @@ function openExams(lv,back){
     <div class="dlv">${K.levels().map(l=>`<button data-xl="${l.id}" aria-pressed="${l.id===L.id}">${l.name}</button>`).join('')}</div>
     <div class="hint" style="text-align:center">Tuần ${weekRange(w)} · đổi đề sau ${weekLeft()}</div>
     <div class="excs">${cards}</div>
-    <div class="hint" style="margin-top:8px">${L.lang==='en'?`Đề TOEIC 2 kỹ năng: phần <b>Nghe</b> (Listening) và phần <b>Đọc</b> (Reading), mỗi phần 5–495 điểm, tổng ${TOEIC_MAX}.`:`Thang điểm ${EXAM_MAX}.`} Mỗi đề chỉ được làm <b>một lần</b>. Đạt từ <b>${K.pass}</b> điểm sẽ được ghi tên lên 🏆 Bảng vàng ${K.name} tuần này. Bạn đang có ${GEM} ${save.gems}.</div>
+    <div class="hint" style="margin-top:8px">${L.lang==='en'?`Đề TOEIC 2 kỹ năng: phần <b>Nghe</b> (Listening) và phần <b>Đọc</b> (Reading), mỗi phần 5–495 điểm, tổng ${TOEIC_MAX}.`:`Thang điểm ${EXAM_MAX}, hệ số Bảng vàng <b>×${coefOf(L.id)}</b>.`} Mỗi đề chỉ được làm <b>một lần</b>. Đạt từ <b>${K.pass}</b> điểm sẽ được ghi tên lên 🏆 Bảng vàng ${K.name} tuần này. Bạn đang có ${GEM} ${save.gems}.</div>
     <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn gold" id="xGold" style="flex:1 1 0">🏆 Bảng vàng ${K.name}</button><button class="btn alt" id="xBack" style="flex:1 1 0">Quay lại</button></div>
   </div>`);
   ovl.querySelectorAll('[data-xl]').forEach(b=>b.onclick=()=>openExams(b.dataset.xl,back));
@@ -1454,6 +1457,7 @@ function finishExam(back){
     <div class="exscore ${pass?'ok':'no'}">${score}<small>/${K.max}</small></div>
     ${sc.L!=null?`<div class="stat"><span>🎧 Nghe ${sc.L}/495</span><span>📖 Đọc ${sc.R}/495</span></div>`:''}
     <div class="gembar">${pass?`🎉 Đạt! Bạn đủ điều kiện lên Bảng vàng ${K.name}`:'Chưa đạt, cần từ '+K.pass+' điểm'}</div>
+    ${L.lang==='zh'?`<div class="hint" style="text-align:center">Điểm tính Bảng vàng: ${score} × hệ số ${coefOf(L.id)} = <b>${score*coefOf(L.id)}</b></div>`:''}
     <div class="hint">Đúng ${R.ok}/${total} câu. Các từ trong đề đã được thêm vào Từ điển ${esc(lvName(L))}.</div>
     <div id="xSub" class="subline"></div>
     <div class="btns" style="margin-top:10px;flex-wrap:nowrap"><button class="btn gold" id="xG" style="flex:1 1 0">🏆 Bảng vàng</button><button class="btn blue" id="xMore" style="flex:1 1 0">Đề khác</button><button class="btn alt" id="xM" style="flex:1 1 0">Menu</button></div>
@@ -1514,7 +1518,7 @@ function openGold(lang,back){
     </div>
     <div class="hint" style="text-align:center">Tuần ${weekRange(w)} · chốt sau ${weekLeft()}</div>
     <div class="honor" id="gHon" hidden></div>
-    <div class="hint" style="margin:6px 0">Ai đạt từ ${K.pass}/${K.max} điểm ở ít nhất một đề thi ${K.name} được ghi tên. Điểm là trung bình cộng mọi đề ${K.name} đã làm trong tuần. Top 3 cuối tuần nhận danh hiệu và Gem: ${[1,2,3].map(r=>`${TITLES[r][0]} +${REWARD[r]}`).join(' · ')}.</div>
+    <div class="hint" style="margin:6px 0">Ai đạt từ ${K.pass}/${K.max} điểm ở ít nhất một đề thi ${K.name} được ghi tên. Điểm là trung bình cộng mọi đề ${K.name} đã làm trong tuần${lang==='zh'?', mỗi đề nhân hệ số theo cấp: <b>HSK1–2 ×1, HSK3–4 ×2, HSK5–6 ×3</b>':''}. Top 3 cuối tuần nhận danh hiệu và Gem: ${[1,2,3].map(r=>`${TITLES[r][0]} +${REWARD[r]}`).join(' · ')}.</div>
     <ul class="lb gold" id="gList"><li class="lbmsg" style="display:block">Đang tải...</li></ul>
     <div class="btns" style="margin-top:8px;flex-wrap:nowrap"><button class="btn gold" id="gEx" style="flex:1 1 0">📝 Làm đề ${K.name}</button><button class="btn alt" id="gBack" style="flex:1 1 0">Quay lại</button></div>
   </div>`, true);
