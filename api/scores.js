@@ -1,13 +1,14 @@
 // Shared leaderboards for Xingxing, stored in Upstash Redis (Vercel Storage → Upstash for Redis).
 // GET  /api/scores?board=zh|en|hsk1..hsk6|en1..en3&me=<playerId> → { top:[{id,name,score,t}], me:{rank,score}|null }
-// GET  /api/scores?gold=1&me=<playerId>                           → { week, top:[{id,name,score,n,t}], me, honors:{week,top} }
+// GET  /api/scores?gold=zh|en&me=<playerId>                       → { week, lang, top:[{id,name,score,n,t}], me, honors:{week,top}, other }
+//      (zh = HSK golden board, scores /300, pass 180; en = TOEIC golden board, scores /990, pass 600)
 // POST /api/scores {id,name,level,mode,score}                     → { rankLang, rankLevel, total, best }
 // POST /api/scores {action:'rename',id,name}                      → { ok }
-// POST /api/scores {action:'exam',id,name,exam,score}             → { ok, dup, avg, n, rank }
-// POST /api/scores {action:'claim',id}                            → { ok, rank, gems, week } (last week's top 3, once)
+// POST /api/scores {action:'exam',id,name,exam,score}             → { ok, dup, lang, avg, n, rank } (exam '<week>-hsk3-0' or '<week>-en2-1')
+// POST /api/scores {action:'claim',id,lang}                       → { ok, lang, rank, gems, week } (last week's top 3 of that board, once)
 // GET  /api/scores?device=<fp>                                   → { id, name } | {} (account already tied to this device)
 // POST /api/scores {action:'device',id,fp}                        → { id, name } (the device's one account)
-// `t` is the player's title rank (1-3) from last week's golden board.
+// `t` is the player's best title rank (1-3) from last week's two golden boards.
 // One device = one account: the device key is a hash of the game's device fingerprint and the caller's IP.
 
 const crypto = require('crypto');
@@ -37,8 +38,6 @@ const LEVEL_IDS = ['hsk1', 'hsk2', 'hsk3', 'hsk4', 'hsk5', 'hsk6', 'en1', 'en2',
 const BOARDS = ['zh', 'en', 'all', ...LEVEL_IDS];
 const MODES = ['easy', 'normal', 'hard'];
 const MAX_SCORE = 3000; // one round can't reach this (18 chickens x 30 points x 2.6 at HSK 6)
-const EXAM_MAX = 300;
-const PASS = 180;
 const REWARD = { 1: 100, 2: 60, 3: 40 };
 const TOP = 50;
 
@@ -78,7 +77,11 @@ function weekId(ms = Date.now()) {
 }
 
 const key = (b) => 'xx:lb:' + b;
-const gold = (w) => 'xx:gold:' + w;
+// Golden boards are separate: HSK (Chinese) keeps the original keys, TOEIC (English) adds "En".
+const sfx = (lang) => (lang === 'en' ? 'En' : '');
+const gold = (w, lang = 'zh') => 'xx:gold' + sfx(lang) + ':' + w;
+const EXAM = { zh: { max: 300, pass: 180 }, en: { max: 990, pass: 600 } };
+const langOf = (q) => (q === 'en' ? 'en' : 'zh');
 const validId = (s) => typeof s === 'string' && /^[a-z0-9]{6,32}$/.test(s);
 const cleanName = (s) =>
   String(s || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20);
@@ -111,13 +114,18 @@ function pairs(flat) {
 }
 
 // Last week's golden board top 3: they hold the titles this week.
-async function honors(week) {
-  const [flat] = await redis([['ZRANGE', gold(week - 1), '0', '2', 'REV', 'WITHSCORES']]);
+async function honors(week, lang = 'zh') {
+  const [flat] = await redis([['ZRANGE', gold(week - 1, lang), '0', '2', 'REV', 'WITHSCORES']]);
   const { ids, scores } = pairs(flat);
   const names = ids.length ? (await redis([['HMGET', 'xx:names', ...ids]]))[0] : [];
-  return { week: week - 1, top: ids.map((id, i) => ({ id, name: shown(names[i], id), score: num(scores[i]), rank: i + 1 })) };
+  return { week: week - 1, lang, top: ids.map((id, i) => ({ id, name: shown(names[i], id), score: num(scores[i]), rank: i + 1 })) };
 }
-const titleMap = (h) => Object.fromEntries(h.top.map((r) => [r.id, r.rank]));
+// A player on both boards shows their better title
+function titleMap(...hs) {
+  const t = {};
+  for (const h of hs) for (const r of h.top) t[r.id] = Math.min(t[r.id] || 9, r.rank);
+  return t;
+}
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -140,20 +148,25 @@ module.exports = async (req, res) => {
 
     if (req.method === 'GET') {
       const me = validId(req.query.me) ? req.query.me : null;
-      const h = await honors(week);
-      const titles = titleMap(h);
+      const hz = await honors(week, 'zh');
+      const he = await honors(week, 'en');
+      const titles = titleMap(hz, he);
 
       if (req.query.gold) {
-        const cmds = [['ZRANGE', gold(week), '0', String(TOP - 1), 'REV', 'WITHSCORES']];
-        if (me) cmds.push(['ZREVRANK', gold(week), me], ['ZSCORE', gold(week), me], ['HGET', 'xx:gcnt:' + week, me]);
+        // gold=1|zh → HSK board, gold=en → TOEIC board
+        const lang = langOf(req.query.gold);
+        const h = lang === 'en' ? he : hz;
+        const cnt_ = 'xx:gcnt' + sfx(lang) + ':' + week;
+        const cmds = [['ZRANGE', gold(week, lang), '0', String(TOP - 1), 'REV', 'WITHSCORES']];
+        if (me) cmds.push(['ZREVRANK', gold(week, lang), me], ['ZSCORE', gold(week, lang), me], ['HGET', cnt_, me]);
         const [flat, rank, score, cnt] = await redis(cmds);
         const { ids, scores } = pairs(flat);
         const [names, counts] = ids.length
-          ? await redis([['HMGET', 'xx:names', ...ids], ['HMGET', 'xx:gcnt:' + week, ...ids]])
+          ? await redis([['HMGET', 'xx:names', ...ids], ['HMGET', cnt_, ...ids]])
           : [[], []];
         const top = ids.map((id, i) => ({ id, name: shown(names[i], id), score: num(scores[i]), n: Number(counts[i] || 0), t: titles[id] || 0 }));
         const meOut = me && rank !== null && rank !== undefined ? { rank: rank + 1, score: num(score), n: Number(cnt || 0) } : null;
-        return res.status(200).json({ week, top, me: meOut, honors: h });
+        return res.status(200).json({ week, lang, top, me: meOut, honors: h, other: lang === 'en' ? hz : he });
       }
 
       const board = BOARDS.includes(req.query.board) ? req.query.board : 'zh';
@@ -164,7 +177,7 @@ module.exports = async (req, res) => {
       const names = ids.length ? (await redis([['HMGET', 'xx:names', ...ids]]))[0] : [];
       const top = ids.map((id, i) => ({ id, name: shown(names[i], id), score: Math.round(scores[i]), t: titles[id] || 0 }));
       const meOut = me && rank !== null && rank !== undefined ? { rank: rank + 1, score: Math.round(Number(score)) } : null;
-      return res.status(200).json({ board, top, me: meOut, honors: h });
+      return res.status(200).json({ board, top, me: meOut, honors: hz, other: he });
     }
 
     if (req.method === 'POST') {
@@ -200,20 +213,22 @@ module.exports = async (req, res) => {
 
       if (b.action === 'exam') {
         // exam id = "<week>-<level>-<n>"; this week's or last week's (a test finished just after midnight Sunday)
-        const m = /^(\d{1,5})-(hsk[1-6])-([0-2])$/.exec(String(b.exam || ''));
+        const m = /^(\d{1,5})-(hsk[1-6]|en[1-3])-([0-2])$/.exec(String(b.exam || ''));
+        const lang = m && m[2].startsWith('en') ? 'en' : 'zh';
+        const sx = sfx(lang);
         const score = Math.floor(Number(b.score));
-        if (!validId(b.id) || !name || !m || !(score >= 0 && score <= EXAM_MAX)) return res.status(400).json({ error: 'bad request' });
+        if (!validId(b.id) || !name || !m || !(score >= 0 && score <= EXAM[lang].max)) return res.status(400).json({ error: 'bad request' });
         const w = Number(m[1]);
         if (w !== week && w !== week - 1) return res.status(400).json({ error: 'old exam' });
         const [fresh] = await redis([['HSETNX', 'xx:exams:' + b.id, b.exam, String(score)]]);
         await redis([['HSET', 'xx:names', b.id, name]]);
         if (!fresh) return res.status(200).json({ ok: true, dup: true });
         const cmds = [
-          ['HINCRBY', 'xx:gsum:' + w, b.id, String(score)],
-          ['HINCRBY', 'xx:gcnt:' + w, b.id, '1'],
+          ['HINCRBY', 'xx:gsum' + sx + ':' + w, b.id, String(score)],
+          ['HINCRBY', 'xx:gcnt' + sx + ':' + w, b.id, '1'],
         ];
-        if (score >= PASS) cmds.push(['SADD', 'xx:gpass:' + w, b.id]);
-        cmds.push(['SISMEMBER', 'xx:gpass:' + w, b.id]);
+        if (score >= EXAM[lang].pass) cmds.push(['SADD', 'xx:gpass' + sx + ':' + w, b.id]);
+        cmds.push(['SISMEMBER', 'xx:gpass' + sx + ':' + w, b.id]);
         const out = await redis(cmds);
         const sum = Number(out[0]);
         const n = Number(out[1]);
@@ -221,19 +236,20 @@ module.exports = async (req, res) => {
         const avg = Math.round((sum / n) * 10) / 10;
         let rank = null;
         if (passed) {
-          const [, r] = await redis([['ZADD', gold(w), String(avg), b.id], ['ZREVRANK', gold(w), b.id]]);
+          const [, r] = await redis([['ZADD', gold(w, lang), String(avg), b.id], ['ZREVRANK', gold(w, lang), b.id]]);
           rank = r + 1;
         }
-        return res.status(200).json({ ok: true, avg, n, passed, rank });
+        return res.status(200).json({ ok: true, lang, avg, n, passed, rank });
       }
 
       if (b.action === 'claim') {
         if (!validId(b.id)) return res.status(400).json({ error: 'bad request' });
-        const h = await honors(week);
+        const lang = langOf(b.lang);
+        const h = await honors(week, lang);
         const mine = h.top.find((r) => r.id === b.id);
-        if (!mine) return res.status(200).json({ ok: false });
-        const [fresh] = await redis([['HSETNX', 'xx:claim:' + h.week, b.id, '1']]);
-        return res.status(200).json({ ok: !!fresh, rank: mine.rank, gems: REWARD[mine.rank], week: h.week });
+        if (!mine) return res.status(200).json({ ok: false, lang, week: h.week });
+        const [fresh] = await redis([['HSETNX', 'xx:claim' + sfx(lang) + ':' + h.week, b.id, '1']]);
+        return res.status(200).json({ ok: !!fresh, lang, rank: mine.rank, gems: REWARD[mine.rank], week: h.week });
       }
 
       const score = Math.floor(Number(b.score));
