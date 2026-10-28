@@ -167,7 +167,7 @@ module.exports = async (req, res) => {
           if (!m || Number(m[1]) !== week || (m[2].startsWith('en') ? 'en' : 'zh') !== lang) continue;
           const score = Number(flat[i + 1]);
           const coef = lang === 'zh' ? ZH_COEF[m[2]] : 1;
-          exams.push({ lv: m[2], no: Number(m[3]) + 1, score, coef, pts: score * coef, pass: score >= EXAM[lang].pass });
+          exams.push({ lv: m[2], no: Number(m[3]) + 1, score, coef, pts: score >= EXAM[lang].pass ? score * coef : 0, pass: score >= EXAM[lang].pass });
         }
         exams.sort((x, y) => y.pts - x.pts);
         return res.status(200).json({ id, lang, name: shown(name, id), t: titles[id] || 0, score: sc === null ? null : num(sc), rank: rank === null || rank === undefined ? null : rank + 1, exams });
@@ -244,23 +244,25 @@ module.exports = async (req, res) => {
         const [fresh] = await redis([['HSETNX', 'xx:exams:' + b.id, b.exam, String(score)]]);
         await redis([['HSET', 'xx:names', b.id, name]]);
         if (!fresh) return res.status(200).json({ ok: true, dup: true });
-        // HSK board weights harder exams: HSK1-2 ×1, HSK3-4 ×2, HSK5-6 ×3
+        // Board score = total of this week's PASSED exams, HSK weighted by level
+        // (HSK1-2 ×1, HSK3-4 ×2, HSK5-6 ×3). Recomputed from the exam log so
+        // older entries made under previous rules are corrected too.
         const coef = lang === 'zh' ? ZH_COEF[m[2]] : 1;
-        const cmds = [
-          ['HINCRBY', 'xx:gsum' + sx + ':' + w, b.id, String(score * coef)],
-          ['HINCRBY', 'xx:gcnt' + sx + ':' + w, b.id, '1'],
-        ];
-        if (score >= EXAM[lang].pass) cmds.push(['SADD', 'xx:gpass' + sx + ':' + w, b.id]);
-        cmds.push(['SISMEMBER', 'xx:gpass' + sx + ':' + w, b.id]);
-        const out = await redis(cmds);
-        const sum = Number(out[0]);
-        const n = Number(out[1]);
-        const passed = Number(out[out.length - 1]) === 1;
-        const avg = Math.round((sum / n) * 10) / 10;
+        const [flat] = await redis([['HGETALL', 'xx:exams:' + b.id]]);
+        let sum = 0, n = 0;
+        for (let k = 0; k + 1 < (flat || []).length; k += 2) {
+          const e = /^(\d{1,5})-(hsk[1-6]|en[1-3])-([0-2])$/.exec(flat[k]);
+          if (!e || Number(e[1]) !== w || (e[2].startsWith('en') ? 'en' : 'zh') !== lang) continue;
+          const sc = Number(flat[k + 1]);
+          if (sc < EXAM[lang].pass) continue;
+          sum += sc * (lang === 'zh' ? ZH_COEF[e[2]] : 1); n++;
+        }
+        const passed = n > 0;
+        const avg = n ? Math.round((sum / n) * 10) / 10 : 0;
         let rank = null;
+        await redis([['HSET', 'xx:gsum' + sx + ':' + w, b.id, String(sum)], ['HSET', 'xx:gcnt' + sx + ':' + w, b.id, String(n)]]);
         if (passed) {
-          // Board score is the total of all this week's (weighted) exam scores
-          const [, r] = await redis([['ZADD', gold(w, lang), String(sum), b.id], ['ZREVRANK', gold(w, lang), b.id]]);
+          const [, , r] = await redis([['SADD', 'xx:gpass' + sx + ':' + w, b.id], ['ZADD', gold(w, lang), String(sum), b.id], ['ZREVRANK', gold(w, lang), b.id]]);
           rank = r + 1;
         }
         return res.status(200).json({ ok: true, lang, avg, sum, n, passed, rank, coef });
