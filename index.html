@@ -344,10 +344,11 @@ button{font-family:inherit;color:inherit}
 .dock .tool2{flex:1;max-width:92px;position:relative}
 .tool2 kbd{display:none;position:absolute;top:-7px;right:-5px;background:var(--ink);color:#fff;font:700 10px/1 system-ui,sans-serif;border-radius:5px;padding:3px 4px}
 @media (hover:hover) and (pointer:fine){.tool2 kbd{display:block}}
+/* on a computer the dock is a small framed panel in the bottom-left corner */
 @media (min-width:760px){
-  .overlay.mwrap{padding:58px 10px 16px}
-  .dock{left:auto;right:auto;top:50%;bottom:auto;left:calc(50% - 248px - 118px);transform:translateY(-50%);flex-direction:column;padding:0;width:96px}
-  .dock .tool2{max-width:none;padding:8px 2px}
+  .overlay.mwrap{padding:58px 10px 98px}
+  .dock{left:14px;right:auto;bottom:14px;padding:8px;gap:6px;background:var(--paper);border:3px solid var(--ink);border-radius:16px;box-shadow:0 4px 0 var(--ink)}
+  .dock .tool2{flex:none;width:76px;max-width:none}
 }
 .acct{display:flex;gap:8px}
 .acct .who{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;justify-content:flex-start;display:block;text-align:left}
@@ -498,7 +499,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 27;
+const VERSION = 28;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,hsk7:3,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
