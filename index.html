@@ -424,7 +424,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 11;
+const VERSION = 12;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -440,7 +440,10 @@ const REWARD = {1:100,2:60,3:40};
 const SKEY='bangavocab_v1';
 let save={best:{},used:{},gems:5,pid:'',name:'',pending:[],set:{lang:'zh',lv:'hsk1',mode:'easy',type:true,sound:true}};
 try{const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s) save=Object.assign(save,s,{set:Object.assign(save.set,s.set||{})});}catch(e){}
-function persist(){try{localStorage.setItem(SKEY,JSON.stringify(save))}catch(e){}}
+// One device = one account: the player id is also kept in a long-lived cookie, so clearing
+// the game's storage alone does not create a second account; the server also remembers the device.
+function persist(){try{localStorage.setItem(SKEY,JSON.stringify(save))}catch(e){} try{ if(save.pid) document.cookie='xx_pid='+save.pid+';max-age=315360000;path=/;SameSite=Lax'; }catch(e){}}
+if(!save.pid){ try{ const m=/(?:^|; )xx_pid=([a-z0-9]{6,32})/.exec(document.cookie); if(m){ save.pid=m[1]; persist(); } }catch(e){} }
 if(!save.pid){save.pid=(Date.now().toString(36)+Math.random().toString(36).slice(2,10)).slice(0,20); persist();}
 if(!Array.isArray(save.pending)) save.pending=[];
 if(!save.v9){ save.used={}; save.v9=1; persist(); }
@@ -1003,6 +1006,14 @@ function menu(){
   setTower(1); $('#whpBar').style.width='100%'; $('#whpNum').textContent=100; $('#whp').className='whp';
   $('#hud').hidden=true; $('#timeBtn').hidden=true; stage.classList.remove('paused');
   if(save.examRun){ finishExam(menu); return; }
+  if(save.name&&badName(save.name)){
+    save.forceRename=1; persist();
+    showOverlay(`<div class="card pop-in" style="max-width:420px;text-align:center"><h2>Cần đổi tên</h2>
+      <div class="hint" style="margin:8px 0">Tên <b>${esc(save.name)}</b> trái với thuần phong mỹ tục Việt Nam nên không được dùng nữa. Bạn hãy đặt tên mới (miễn phí).</div>
+      <button class="btn big" id="frOk">Đặt tên mới</button></div>`);
+    $('#frOk').onclick=()=>askName(menu); return;
+  }
+  if(save.name&&!save.bound) bindDevice(menu);
   flushPending();
   const s=save.set;
   const levels=LEVELS.filter(l=>l.lang===s.lang);
@@ -1047,7 +1058,7 @@ function menu(){
   $('#nameBtn').onclick=()=>askName(menu);
 }
 const NAME_MAX=20, RENAME_COST=5;
-function renameCost(){ return !save.name ? 0 : ((save.renames||0)<1 ? 0 : RENAME_COST); }
+function renameCost(){ return !save.name||save.forceRename ? 0 : ((save.renames||0)<1 ? 0 : RENAME_COST); }
 function askName(back){
   const first=!save.name, cost=renameCost();
   const note=first?'Tên này hiện trên bảng xếp hạng chung. Sau mỗi màn, điểm của bạn tự động được lưu vào tên này.'
@@ -1060,16 +1071,63 @@ function askName(back){
     <div class="btns"><button class="btn alt" id="nmBack">${first?'Để sau':'Quay lại'}</button></div></div>`);
   $('#nmForm').onsubmit=e=>{e.preventDefault();
     const v=cleanName($('#nmIn').value); if(!v) return;
-    if(v===save.name){ back(); return; }
+    if(badName(v)){ $('#nmMsg').textContent=BAD_MSG; SFX.bad(); return; }
+    if(v===save.name&&!badName(save.name)){ back(); return; }
     if(!first){
       if(cost && save.gems<cost){ $('#nmMsg').textContent=`Cần ${cost} Gem để đổi tên, bạn đang có ${save.gems}.`; SFX.bad(); return; }
-      save.gems-=cost; save.renames=(save.renames||0)+1;
+      save.gems-=cost; if(save.forceRename) delete save.forceRename; else save.renames=(save.renames||0)+1;
     }
     save.name=v; persist();
     if(!first) api('POST',{action:'rename',id:save.pid,name:v}).catch(()=>{});
+    else bindDevice(back);
     back();
   };
   $('#nmBack').onclick=back;
+}
+// Names against Vietnamese fine customs (thuần phong mỹ tục): vulgar and sexual words, insults, leaders' names.
+// BAD_SUB is matched inside the name with diacritics, spaces and punctuation removed ("Đ.ị.t", "d i t m e", "ditttme").
+// BAD_TOK is matched as a whole word with diacritics kept, so "đĩ" is caught but "Đi", "Đàm" or "Các" are not.
+const BAD_SUB=['ditme','ditmia','ditcu','ditbo','ditnhau','dmm','dcm','dkm','dkmm','dmcs','cmnr','vcl','vkl','vailon','lonme','concac','cucac','caicac','daubuoi','duongvat','memay','chomay','occho','occac','sucvat','thangngu','conngu','dongu','dodiem','didiem','phodi','gaigoi','thangcho','hiepdam','loanluan','khieudam','damduc','fuck','fuk','shit','bitch','pussy','cunt','nigg','porn','hentai','asshole','bastard','motherf','dick','penis','vagina','xxx','sex','hochiminh','nguyenphutrong','phandong'];
+const BAD_PHRASE=['bác hồ','bac ho','cụ hồ','chủ tịch hồ'];
+const BAD_TOK=['địt','đỵt','đĩ','cặc','lồn','buồi','đéo','đụ','dâm','ngu','đm','đcm','đkm','cl','clm','cc','cmm','cmn','vl','vcl','ml','clgt','loz','djt','dit','cac','lon','cak','dm','dcm','vkl'];
+function badName(s){
+  const low=String(s||'').normalize('NFC').toLowerCase();
+  const plain=low.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d')
+    .replace(/[0@4]/g,m=>({'0':'o','@':'a','4':'a'})[m]).replace(/[1!|]/g,'i').replace(/3/g,'e').replace(/[5$]/g,'s');
+  const compact=plain.replace(/[^a-z]/g,''), squeezed=compact.replace(/(.)\1+/g,'$1');
+  if(BAD_SUB.some(w=>compact.includes(w)||squeezed.includes(w))) return true;
+  const toks=low.split(/[^\p{L}\p{N}]+/u).filter(Boolean).map(t=>t.replace(/(.)\1+/gu,'$1'));
+  if(toks.some(t=>BAD_TOK.includes(t))) return true;
+  const spaced=' '+toks.join(' ')+' ';
+  if(BAD_PHRASE.some(p=>spaced.includes(' '+p+' '))) return true;
+  // short words typed with gaps, e.g. "đ m" or "c.l"
+  const joined=toks.join('');
+  return joined.length<=4 && BAD_TOK.includes(joined);
+}
+
+const BAD_MSG='Tên này trái với thuần phong mỹ tục Việt Nam. Bạn hãy chọn tên khác nhé.';
+function deviceFP(){
+  let c='';
+  try{ const cv=document.createElement('canvas'); cv.width=220; cv.height=40; const x=cv.getContext('2d'); x.textBaseline='top'; x.font='16px Arial'; x.fillStyle='#f60'; x.fillRect(0,0,110,20); x.fillStyle='#069'; x.fillText('Xingxing 鸡 ✓ 2024',2,2); c=cv.toDataURL(); }catch(e){}
+  const sc=[screen.width,screen.height].sort((a,b)=>a-b).join('x');
+  const parts=[navigator.userAgent,navigator.language,sc,devicePixelRatio,Intl.DateTimeFormat().resolvedOptions().timeZone,navigator.hardwareConcurrency,navigator.platform,c].join('|');
+  return seedOf(parts).toString(36)+seedOf('#'+parts).toString(36);
+}
+// Tie this device to the current account; if the device already has another account, switch to it.
+function bindDevice(after){
+  if(!save.name) return;
+  api('POST',{action:'device',id:save.pid,name:save.name,fp:deviceFP()}).then(d=>{
+    save.bound=1;
+    if(d.id&&d.id!==save.pid){ save.pid=d.id; if(d.name) save.name=d.name; persist(); oneAccount(d.name,after); return; }
+    persist();
+  }).catch(()=>{});
+}
+function oneAccount(name,next){
+  showOverlay(`<div class="card pop-in" style="max-width:420px;text-align:center">
+    <h2>Mỗi thiết bị một tài khoản</h2>
+    <div class="hint" style="margin:8px 0">Thiết bị này đã có tài khoản <b>${esc(name||'của bạn')}</b>. Bạn sẽ tiếp tục chơi bằng tài khoản này.</div>
+    <button class="btn big" id="oaOk">Vào game</button></div>`);
+  $('#oaOk').onclick=next||menu;
 }
 const cleanName=v=>v.replace(/[\u0000-\u001f<>]/g,'').replace(/\s+/g,' ').trim().slice(0,NAME_MAX);
 
@@ -1168,7 +1226,7 @@ function endGame(win){
     else {
       box.innerHTML=`<div class="subline">Nhập tên tài khoản để lưu điểm (các màn sau sẽ tự lưu):</div><form class="namein" id="subForm"><input id="subName" maxlength="20" placeholder="Tên của bạn" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">Lưu điểm</button></form>`;
       fitCard();
-      $('#subForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#subName').value); if(!v) return; save.name=v; persist(); send();};
+      $('#subForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#subName').value); if(!v) return; if(badName(v)){ toast(BAD_MSG); SFX.bad(); return; } save.name=v; persist(); bindDevice(); send();};
     }
   };
   setTimeout(()=>verdict(win,rows.length-right,rows.length,showResult), win?300:900);
@@ -1424,7 +1482,12 @@ function splash(){
       <button class="btn start" id="startBtn">Bắt đầu</button>
     </div>
     <div class="ver">Phiên bản ${VERSION}</div>`,false,'splash');
-  const go=()=>{ ac(); if(save.name) menu(); else askName(menu); };
+  const go=()=>{ ac(); if(save.name) return menu();
+    // no account in this browser: the device may already have one (storage cleared, private tab)
+    let done=false; const ask=()=>{ if(!done){ done=true; askName(menu); } };
+    setTimeout(ask,2500);
+    api('GET',null,'?device='+deviceFP()).then(d=>{ if(done) return; if(d.id){ done=true; save.pid=d.id; save.name=d.name||''; save.bound=1; persist(); d.name?oneAccount(d.name,menu):askName(menu); } else ask(); }).catch(ask);
+  };
   $('#startBtn').onclick=go;
 }
 splash();

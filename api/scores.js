@@ -5,7 +5,33 @@
 // POST /api/scores {action:'rename',id,name}                      → { ok }
 // POST /api/scores {action:'exam',id,name,exam,score}             → { ok, dup, avg, n, rank }
 // POST /api/scores {action:'claim',id}                            → { ok, rank, gems, week } (last week's top 3, once)
+// GET  /api/scores?device=<fp>                                   → { id, name } | {} (account already tied to this device)
+// POST /api/scores {action:'device',id,fp}                        → { id, name } (the device's one account)
 // `t` is the player's title rank (1-3) from last week's golden board.
+// One device = one account: the device key is a hash of the game's device fingerprint and the caller's IP.
+
+const crypto = require('crypto');
+
+// Names against Vietnamese fine customs (thuần phong mỹ tục): vulgar and sexual words, insults, leaders' names.
+// BAD_SUB is matched inside the name with diacritics, spaces and punctuation removed ("Đ.ị.t", "d i t m e", "ditttme").
+// BAD_TOK is matched as a whole word with diacritics kept, so "đĩ" is caught but "Đi", "Đàm" or "Các" are not.
+const BAD_SUB=['ditme','ditmia','ditcu','ditbo','ditnhau','dmm','dcm','dkm','dkmm','dmcs','cmnr','vcl','vkl','vailon','lonme','concac','cucac','caicac','daubuoi','duongvat','memay','chomay','occho','occac','sucvat','thangngu','conngu','dongu','dodiem','didiem','phodi','gaigoi','thangcho','hiepdam','loanluan','khieudam','damduc','fuck','fuk','shit','bitch','pussy','cunt','nigg','porn','hentai','asshole','bastard','motherf','dick','penis','vagina','xxx','sex','hochiminh','nguyenphutrong','phandong'];
+const BAD_PHRASE=['bác hồ','bac ho','cụ hồ','chủ tịch hồ'];
+const BAD_TOK=['địt','đỵt','đĩ','cặc','lồn','buồi','đéo','đụ','dâm','ngu','đm','đcm','đkm','cl','clm','cc','cmm','cmn','vl','vcl','ml','clgt','loz','djt','dit','cac','lon','cak','dm','dcm','vkl'];
+function badName(s){
+  const low=String(s||'').normalize('NFC').toLowerCase();
+  const plain=low.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d')
+    .replace(/[0@4]/g,m=>({'0':'o','@':'a','4':'a'})[m]).replace(/[1!|]/g,'i').replace(/3/g,'e').replace(/[5$]/g,'s');
+  const compact=plain.replace(/[^a-z]/g,''), squeezed=compact.replace(/(.)\1+/g,'$1');
+  if(BAD_SUB.some(w=>compact.includes(w)||squeezed.includes(w))) return true;
+  const toks=low.split(/[^\p{L}\p{N}]+/u).filter(Boolean).map(t=>t.replace(/(.)\1+/gu,'$1'));
+  if(toks.some(t=>BAD_TOK.includes(t))) return true;
+  const spaced=' '+toks.join(' ')+' ';
+  if(BAD_PHRASE.some(p=>spaced.includes(' '+p+' '))) return true;
+  // short words typed with gaps, e.g. "đ m" or "c.l"
+  const joined=toks.join('');
+  return joined.length<=4 && BAD_TOK.includes(joined);
+}
 
 const LEVEL_IDS = ['hsk1', 'hsk2', 'hsk3', 'hsk4', 'hsk5', 'hsk6', 'en1', 'en2', 'en3'];
 const BOARDS = ['zh', 'en', 'all', ...LEVEL_IDS];
@@ -56,6 +82,12 @@ const gold = (w) => 'xx:gold:' + w;
 const validId = (s) => typeof s === 'string' && /^[a-z0-9]{6,32}$/.test(s);
 const cleanName = (s) =>
   String(s || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20);
+const shown = (n) => (n && badName(n) ? 'Người chơi' : n || '');
+const devKey = (req, fp) => {
+  const ip = String(req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+  return 'xx:dev:' + crypto.createHash('sha256').update(String(fp).slice(0, 64) + '|' + ip).digest('hex').slice(0, 32);
+};
+const validFp = (s) => typeof s === 'string' && /^[0-9a-z]{6,64}$/.test(s);
 const num = (x) => Math.round(Number(x) * 10) / 10;
 
 function pairs(flat) {
@@ -73,7 +105,7 @@ async function honors(week) {
   const [flat] = await redis([['ZRANGE', gold(week - 1), '0', '2', 'REV', 'WITHSCORES']]);
   const { ids, scores } = pairs(flat);
   const names = ids.length ? (await redis([['HMGET', 'xx:names', ...ids]]))[0] : [];
-  return { week: week - 1, top: ids.map((id, i) => ({ id, name: names[i] || '', score: num(scores[i]), rank: i + 1 })) };
+  return { week: week - 1, top: ids.map((id, i) => ({ id, name: shown(names[i]), score: num(scores[i]), rank: i + 1 })) };
 }
 const titleMap = (h) => Object.fromEntries(h.top.map((r) => [r.id, r.rank]));
 
@@ -83,6 +115,14 @@ module.exports = async (req, res) => {
   const week = weekId();
 
   try {
+    if (req.method === 'GET' && req.query.device) {
+      if (!validFp(req.query.device)) return res.status(400).json({ error: 'bad request' });
+      const [id] = await redis([['GET', devKey(req, req.query.device)]]);
+      if (!id) return res.status(200).json({});
+      const [name] = await redis([['HGET', 'xx:names', id]]);
+      return res.status(200).json({ id, name: shown(name) });
+    }
+
     if (req.method === 'GET') {
       const me = validId(req.query.me) ? req.query.me : null;
       const h = await honors(week);
@@ -96,7 +136,7 @@ module.exports = async (req, res) => {
         const [names, counts] = ids.length
           ? await redis([['HMGET', 'xx:names', ...ids], ['HMGET', 'xx:gcnt:' + week, ...ids]])
           : [[], []];
-        const top = ids.map((id, i) => ({ id, name: names[i] || '', score: num(scores[i]), n: Number(counts[i] || 0), t: titles[id] || 0 }));
+        const top = ids.map((id, i) => ({ id, name: shown(names[i]), score: num(scores[i]), n: Number(counts[i] || 0), t: titles[id] || 0 }));
         const meOut = me && rank !== null && rank !== undefined ? { rank: rank + 1, score: num(score), n: Number(cnt || 0) } : null;
         return res.status(200).json({ week, top, me: meOut, honors: h });
       }
@@ -107,7 +147,7 @@ module.exports = async (req, res) => {
       const [flat, rank, score] = await redis(cmds);
       const { ids, scores } = pairs(flat);
       const names = ids.length ? (await redis([['HMGET', 'xx:names', ...ids]]))[0] : [];
-      const top = ids.map((id, i) => ({ id, name: names[i] || '', score: Math.round(scores[i]), t: titles[id] || 0 }));
+      const top = ids.map((id, i) => ({ id, name: shown(names[i]), score: Math.round(scores[i]), t: titles[id] || 0 }));
       const meOut = me && rank !== null && rank !== undefined ? { rank: rank + 1, score: Math.round(Number(score)) } : null;
       return res.status(200).json({ board, top, me: meOut, honors: h });
     }
@@ -115,6 +155,16 @@ module.exports = async (req, res) => {
     if (req.method === 'POST') {
       const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
       const name = cleanName(b.name);
+      if (name && badName(name)) return res.status(400).json({ error: 'bad name' });
+
+      if (b.action === 'device') {
+        if (!validId(b.id) || !validFp(b.fp)) return res.status(400).json({ error: 'bad request' });
+        const k = devKey(req, b.fp);
+        const [, id] = await redis([['SET', k, b.id, 'NX'], ['GET', k]]);
+        if (id === b.id && name) await redis([['HSETNX', 'xx:names', id, name]]);
+        const [nm] = await redis([['HGET', 'xx:names', id]]);
+        return res.status(200).json({ id, name: shown(nm) });
+      }
 
       if (b.action === 'rename') {
         if (!validId(b.id) || !name) return res.status(400).json({ error: 'bad request' });
