@@ -153,6 +153,26 @@ module.exports = async (req, res) => {
       const he = await honors(week, 'en');
       const titles = titleMap(hz, he);
 
+      if (req.query.detail && validId(req.query.detail)) {
+        // Where a golden-board score comes from: this week's exams for one player
+        const id = req.query.detail;
+        const lang = langOf(req.query.lang);
+        const [flat, name, sc, rank] = await redis([
+          ['HGETALL', 'xx:exams:' + id], ['HGET', 'xx:names', id],
+          ['ZSCORE', gold(week, lang), id], ['ZREVRANK', gold(week, lang), id],
+        ]);
+        const exams = [];
+        for (let i = 0; i + 1 < (flat || []).length; i += 2) {
+          const m = /^(\d{1,5})-(hsk[1-6]|en[1-3])-([0-2])$/.exec(flat[i]);
+          if (!m || Number(m[1]) !== week || (m[2].startsWith('en') ? 'en' : 'zh') !== lang) continue;
+          const score = Number(flat[i + 1]);
+          const coef = lang === 'zh' ? ZH_COEF[m[2]] : 1;
+          exams.push({ lv: m[2], no: Number(m[3]) + 1, score, coef, pts: score * coef, pass: score >= EXAM[lang].pass });
+        }
+        exams.sort((x, y) => y.pts - x.pts);
+        return res.status(200).json({ id, lang, name: shown(name, id), t: titles[id] || 0, score: sc === null ? null : num(sc), rank: rank === null || rank === undefined ? null : rank + 1, exams });
+      }
+
       if (req.query.gold) {
         // gold=1|zh → HSK board, gold=en → TOEIC board
         const lang = langOf(req.query.gold);
@@ -239,10 +259,11 @@ module.exports = async (req, res) => {
         const avg = Math.round((sum / n) * 10) / 10;
         let rank = null;
         if (passed) {
-          const [, r] = await redis([['ZADD', gold(w, lang), String(avg), b.id], ['ZREVRANK', gold(w, lang), b.id]]);
+          // Board score is the total of all this week's (weighted) exam scores
+          const [, r] = await redis([['ZADD', gold(w, lang), String(sum), b.id], ['ZREVRANK', gold(w, lang), b.id]]);
           rank = r + 1;
         }
-        return res.status(200).json({ ok: true, lang, avg, n, passed, rank, coef });
+        return res.status(200).json({ ok: true, lang, avg, sum, n, passed, rank, coef });
       }
 
       if (b.action === 'claim') {

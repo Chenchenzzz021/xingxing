@@ -191,6 +191,12 @@ button{font-family:inherit;color:inherit}
 .exscore{font-weight:800;font-size:64px;line-height:1;margin:8px 0}.exscore small{font-size:22px;opacity:.6}
 .exscore.ok{color:var(--ok)}.exscore.no{color:var(--bad)}
 .lb.gold .n{font-size:13px;opacity:.65;flex:none}
+.lb.gold li[data-pid]{cursor:pointer}.lb.gold li[data-pid]:active{background:#fff8dc}
+.lb.gold .go{opacity:.4;font-size:14px;flex:none}
+.gsrc{list-style:none;margin:8px 0;padding:0;border:3px solid #2a2320;border-radius:14px;background:#fff;overflow:hidden}
+.gsrc li{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:2px dashed rgba(42,35,32,.15);font-weight:700;font-size:15px}
+.gsrc li:last-child{border-bottom:none}.gsrc .ex{flex:1;min-width:0}.gsrc .raw{opacity:.7;font-size:13px}.gsrc .pt{color:#2357c9;min-width:48px;text-align:right}
+.gsrc li.no .pt{color:#b44}
 .opt.en{font-size:19px}
 .qhead .part{font-size:13px;font-weight:800;background:var(--cream);border:2px solid var(--ink);border-radius:999px;padding:1px 8px}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
@@ -431,7 +437,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 18;
+const VERSION = 19;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -1467,7 +1473,7 @@ function finishExam(back){
   if(!save.name){ save.pending.push(entry); persist(); box.textContent='Nhập tên tài khoản ở menu để gửi điểm lên Bảng vàng.'; return; }
   box.textContent='Đang gửi điểm lên Bảng vàng...';
   submitExam(entry).then(d=>{
-    box.innerHTML=d.rank?`Bạn đang đứng hạng <b>#${d.rank}</b> trên Bảng vàng ${K.name} tuần này, điểm trung bình <b>${d.avg}</b> sau ${d.n} đề.`:`Điểm trung bình ${K.name} tuần này của bạn: <b>${d.avg}</b> sau ${d.n} đề. Đạt một đề từ ${K.pass} điểm để lên Bảng vàng.`;
+    box.innerHTML=d.rank?`Bạn đang đứng hạng <b>#${d.rank}</b> trên Bảng vàng ${K.name} tuần này, tổng điểm <b>${d.sum}</b> sau ${d.n} đề.`:`Tổng điểm ${K.name} tuần này của bạn: <b>${d.sum}</b> sau ${d.n} đề. Đạt một đề từ ${K.pass} điểm để lên Bảng vàng.`;
     fitCard();
   }).catch(()=>{ save.pending.push(entry); persist(); box.textContent='Chưa gửi được điểm, game sẽ tự gửi lại lần sau.'; fitCard(); });
 }
@@ -1518,7 +1524,7 @@ function openGold(lang,back){
     </div>
     <div class="hint" style="text-align:center">Tuần ${weekRange(w)} · chốt sau ${weekLeft()}</div>
     <div class="honor" id="gHon" hidden></div>
-    <div class="hint" style="margin:6px 0">Ai đạt từ ${K.pass}/${K.max} điểm ở ít nhất một đề thi ${K.name} được ghi tên. Điểm là trung bình cộng mọi đề ${K.name} đã làm trong tuần${lang==='zh'?', mỗi đề nhân hệ số theo cấp: <b>HSK1–2 ×1, HSK3–4 ×2, HSK5–6 ×3</b>':''}. Top 3 cuối tuần nhận danh hiệu và Gem: ${[1,2,3].map(r=>`${TITLES[r][0]} +${REWARD[r]}`).join(' · ')}.</div>
+    <div class="hint" style="margin:6px 0">Ai đạt từ ${K.pass}/${K.max} điểm ở ít nhất một đề thi ${K.name} được ghi tên. Điểm là <b>tổng điểm</b> mọi đề ${K.name} đã làm trong tuần${lang==='zh'?', mỗi đề nhân hệ số theo cấp: <b>HSK1–2 ×1, HSK3–4 ×2, HSK5–6 ×3</b>':''}. Top 3 cuối tuần nhận danh hiệu và Gem: ${[1,2,3].map(r=>`${TITLES[r][0]} +${REWARD[r]}`).join(' · ')}.</div>
     <ul class="lb gold" id="gList"><li class="lbmsg" style="display:block">Đang tải...</li></ul>
     <div class="btns" style="margin-top:8px;flex-wrap:nowrap"><button class="btn gold" id="gEx" style="flex:1 1 0">📝 Làm đề ${K.name}</button><button class="btn alt" id="gBack" style="flex:1 1 0">Quay lại</button></div>
   </div>`, true);
@@ -1529,10 +1535,37 @@ function openGold(lang,back){
     const hon=$('#gHon'); if(hon&&d.honors.top.length){ hon.innerHTML=`<div class="ht">Vinh danh tuần trước (${weekRange(d.honors.week)})</div><div class="hl">${honorHTML(d.honors)}</div>`; hon.hidden=false; }
     const el=$('#gList'); if(!el) return;
     if(!d.top.length){ el.innerHTML=`<li class="lbmsg" style="display:block">Tuần này chưa ai lên Bảng vàng ${K.name}. Làm đề đạt từ ${K.pass} điểm để là người đầu tiên!</li>`; fitCard(); return; }
-    let html=d.top.slice(0,10).map((r,i)=>`<li class="${r.id===save.pid?'me':''}"><span class="rk">${i+1}</span><span class="nm">${nameT(r.name,r.t)}</span><span class="n">${r.n} đề</span><span class="sc">${r.score}</span></li>`).join('');
-    if(d.me&&d.me.rank>10) html+=`<li class="me"><span class="rk">${d.me.rank}</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n">${d.me.n} đề</span><span class="sc">${d.me.score}</span></li>`;
-    el.innerHTML=html; fitCard();
+    let html=d.top.slice(0,10).map((r,i)=>`<li class="${r.id===save.pid?'me':''}" data-pid="${esc(r.id)}"><span class="rk">${i+1}</span><span class="nm">${nameT(r.name,r.t)}</span><span class="n">${r.n} đề</span><span class="sc">${r.score}</span><span class="go">›</span></li>`).join('');
+    if(d.me&&d.me.rank>10) html+=`<li class="me" data-pid="${esc(save.pid)}"><span class="rk">${d.me.rank}</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n">${d.me.n} đề</span><span class="sc">${d.me.score}</span><span class="go">›</span></li>`;
+    else if(!d.me) html+=`<li class="me"><span class="rk">–</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n" style="flex:1 1 auto;text-align:right">chưa lên bảng</span></li>`;
+    el.innerHTML=html;
+    el.querySelectorAll('[data-pid]').forEach(li=>li.onclick=()=>openGoldDetail(li.dataset.pid,lang,back));
+    fitCard();
   }).catch(()=>{ const el=$('#gList'); if(el) el.innerHTML='<li class="lbmsg" style="display:block">Bảng vàng chạy trên bản web xingxing-two.vercel.app. Kiểm tra mạng rồi thử lại nhé.</li>'; });
+}
+
+// Breakdown of one player's golden-board score: which exams this week it comes from
+function openGoldDetail(pid,lang,back){
+  const K=EXK[lang], ret=()=>openGold(lang,back);
+  showOverlay(`<div class="card pop-in" style="max-width:480px">
+    <h2 id="gdH">Đang tải...</h2>
+    <div class="hint" id="gdS" style="text-align:center"></div>
+    <ul class="gsrc" id="gdL"></ul>
+    <div class="hint" id="gdN"></div>
+    <div class="btns" style="margin-top:8px"><button class="btn alt" id="gdB" style="flex:1 1 0">Quay lại Bảng vàng</button></div>
+  </div>`, true);
+  $('#gdB').onclick=ret;
+  api('GET',null,`?detail=${encodeURIComponent(pid)}&lang=${lang}`).then(d=>{
+    if(!$('#gdH')) return;
+    $('#gdH').innerHTML=nameT(d.name,d.t);
+    $('#gdS').innerHTML=d.rank?`Hạng <b>#${d.rank}</b> Bảng vàng ${K.name} · điểm <b>${d.score}</b>`:`Chưa lên Bảng vàng ${K.name} tuần này`;
+    $('#gdL').innerHTML=d.exams.length?d.exams.map(x=>{const L=LEVELS.find(l=>l.id===x.lv);
+      return `<li class="${x.pass?'':'no'}"><span class="ex">${esc(L?lvName(L):x.lv)} · Đề ${x.no}${x.pass?'':' <span class="raw">(chưa đạt)</span>'}</span><span class="raw">${x.score}${x.coef>1?` × ${x.coef}`:''}</span><span class="pt">${x.pts}</span></li>`;}).join('')
+      :`<li><span class="ex">Tuần này chưa làm đề ${K.name} nào.</span></li>`;
+    const sum=d.exams.reduce((a,x)=>a+x.pts,0);
+    $('#gdN').innerHTML=d.exams.length?`Điểm Bảng vàng = ${d.exams.map(x=>x.pts).join(' + ')} = <b>${sum}</b>${lang==='zh'?'. Hệ số: HSK1–2 ×1, HSK3–4 ×2, HSK5–6 ×3.':'.'}`:'';
+    fitCard();
+  }).catch(()=>{ if($('#gdH')){ $('#gdH').textContent='Không tải được'; $('#gdS').textContent='Kiểm tra mạng rồi thử lại nhé.'; } });
 }
 
 /* First-time tutorial, shown once after the account is created (and from the menu link) */
