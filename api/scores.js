@@ -81,7 +81,7 @@ const key = (b) => 'xx:lb:' + b;
 const sfx = (lang) => (lang === 'en' ? 'En' : '');
 const gold = (w, lang = 'zh') => 'xx:gold' + sfx(lang) + ':' + w;
 const ZH_COEF = { hsk1: 1, hsk2: 1, hsk3: 2, hsk4: 2, hsk5: 3, hsk6: 3 };
-const EXAM = { zh: { max: 300, pass: 180 }, en: { max: 990, pass: 600 } };
+const EXAM = { zh: { max: 300, pass: 180 }, en: { max: 990, pass: 450 } };
 const langOf = (q) => (q === 'en' ? 'en' : 'zh');
 const validId = (s) => typeof s === 'string' && /^[a-z0-9]{6,32}$/.test(s);
 const cleanName = (s) =>
