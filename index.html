@@ -412,6 +412,12 @@ button{font-family:inherit;color:inherit}
 .lb{list-style:none;margin:0;padding:0;border:3px solid var(--ink);border-radius:14px;background:#fff;max-height:min(48vh,420px);overflow-y:auto}
 .lb li{display:flex;align-items:center;gap:10px;padding:5px 12px;border-bottom:2px dashed rgba(42,35,32,.15);font-weight:700;font-size:16px}
 .lb li:last-child{border-bottom:none}
+.av{width:28px;height:28px;border-radius:50%;border:2px solid var(--ink);object-fit:cover;flex:none;background:#ffe9a8;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;vertical-align:middle;color:var(--ink)}
+.chip.who .av{width:24px;height:24px;font-size:12px}
+.av.big{width:84px;height:84px;font-size:36px;border-width:3px}
+.avrow{display:flex;align-items:center;justify-content:center;gap:14px;margin:10px 0}
+.avrow .btns2{display:flex;flex-direction:column;gap:6px}.avrow .btn{padding:6px 14px;font-size:15px}
+#gdH{text-align:center}#gdH .av.big{display:flex;margin:0 auto 4px}
 .lb li.me{background:#fff3c4}
 .lb .rk{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:2.5px solid var(--ink);background:var(--cream);font-size:14px;font-variant-numeric:tabular-nums}
 .lb li:nth-child(1) .rk{background:#ffd34d}.lb li:nth-child(2) .rk{background:#dfe6ee}.lb li:nth-child(3) .rk{background:#f0b27a}
@@ -502,7 +508,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 29;
+const VERSION = 30;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,hsk7:3,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -561,6 +567,23 @@ function spend(n){ if(save.gems<n){ toast('Không đủ Gem. Trả lời đúng 
 const $=s=>document.querySelector(s);
 const rand=n=>Math.floor(Math.random()*n);
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rand(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+// Profile pictures: tiny square data URLs; players without one get their initial in a circle
+const AV_OK=/^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+\/]+=*$/;
+function avHTML(a,name,cls=''){ return a&&AV_OK.test(a)?`<img class="av ${cls}" src="${a}" alt="">`:`<span class="av ${cls}">${esc((String(name||'?').trim()[0]||'?').toUpperCase())}</span>`; }
+// Crop the middle square of a picked photo and shrink it to 96px so it stays a few KB
+function makeAvatar(file,cb,fail){
+  const url=URL.createObjectURL(file), img=new Image();
+  img.onload=()=>{ try{
+    const n=96, cv=document.createElement('canvas'); cv.width=cv.height=n; const x=cv.getContext('2d');
+    const m=Math.min(img.naturalWidth,img.naturalHeight); x.fillStyle='#fff'; x.fillRect(0,0,n,n);
+    x.drawImage(img,(img.naturalWidth-m)/2,(img.naturalHeight-m)/2,m,m,0,0,n,n);
+    let d=cv.toDataURL('image/jpeg',.82); if(d.length>22000) d=cv.toDataURL('image/jpeg',.55);
+    URL.revokeObjectURL(url); cb(d);
+  }catch(e){ fail(); } };
+  img.onerror=()=>{ URL.revokeObjectURL(url); fail(); };
+  img.src=url;
+}
+function sendAvatar(){ if(save.pid&&save.name) api('POST',{action:'avatar',id:save.pid,img:save.avatar||''}).catch(()=>{}); }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TONE=['̄','́','̌','̀'];
 const baseLetters=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/v/g,'u').replace(/[^a-z]/g,'');
@@ -657,8 +680,13 @@ function playDumb(){
   const C=ac(); if(!C) return;
   const go=buf=>{ const s=C.createBufferSource(); s.buffer=buf; const g=C.createGain(); g.gain.value=1; s.connect(g).connect(C.destination); s.start(); };
   if(dumbBuf) return go(dumbBuf);
+  loadDumb(go);
+}
+// Decode the voice line ahead of time (at the start of each round) so it plays the instant the round ends
+function loadDumb(cb){
+  const C=ac(); if(!C||dumbBuf) return;
   const bin=atob(VOICE_DUMB.split(',')[1]), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
-  C.decodeAudioData(u8.buffer,buf=>{ dumbBuf=buf; go(buf); },()=>{});
+  C.decodeAudioData(u8.buffer,buf=>{ dumbBuf=buf; cb&&cb(buf); },()=>{});
 }
 
 /* ================= ART ================= */
@@ -811,6 +839,7 @@ function specialSlots(total){
   return set;
 }
 function startGame(){
+  loadDumb();
   const level=LEVELS.find(l=>l.id===save.set.lv), mode=MODES[save.set.mode];
   if(G) for(const c of G.chks) c.el.remove();
   stage.querySelectorAll('.ball,.puff,.float,.toast').forEach(e=>e.remove());
@@ -1169,7 +1198,7 @@ function menu(){
   // reachable from the dock (and keyboard shortcuts on a computer).
   showOverlay(`<div class="topbar">
       <div class="acct">
-        <button class="chip who" id="nameBtn" title="Đổi tên (phím N)">👤 <b>${save.name?nameT(save.name,myTitle()):'Nhập tên'}</b> <span class="ed">✎</span></button>
+        <button class="chip who" id="nameBtn" title="Tên và ảnh đại diện (phím N)">${avHTML(save.avatar,save.name)} <b>${save.name?nameT(save.name,myTitle()):'Nhập tên'}</b> <span class="ed">✎</span></button>
         <span class="chip gem">${GEM} ${save.gems}</span>
       </div>
       <button class="honor slim" id="honorLine" hidden></button>
@@ -1219,11 +1248,21 @@ function askName(back){
   const note=first?'Tên này hiện trên bảng xếp hạng chung. Sau mỗi màn, điểm của bạn tự động được lưu vào tên này.'
     : cost?`Bạn đã dùng lượt đổi tên miễn phí. Lần này tốn ${GEM}${cost} Gem (đang có ${save.gems}).`
     : 'Lần đổi tên đầu tiên miễn phí. Từ lần sau mỗi lần đổi tốn '+RENAME_COST+' Gem.';
-  showOverlay(`<div class="card pop-in" style="max-width:420px"><h2>${first?'Nhập tên tài khoản':'Đổi tên tài khoản'}</h2>
+  showOverlay(`<div class="card pop-in" style="max-width:420px"><h2>${first?'Nhập tên tài khoản':'Tài khoản'}</h2>
+    <div class="avrow"><span id="avPrev">${avHTML(save.avatar,save.name,'big')}</span>
+      <div class="btns2"><button class="btn alt" id="avUp" type="button">📷 ${save.avatar?'Đổi ảnh':'Tải ảnh lên'}</button><button class="btn alt" id="avDel" type="button"${save.avatar?'':' hidden'}>Xoá ảnh</button></div>
+      <input type="file" id="avFile" accept="image/*" hidden></div>
     <div class="hint">${note} Tối đa ${NAME_MAX} ký tự.</div>
     <form class="namein" id="nmForm"><input id="nmIn" maxlength="${NAME_MAX}" value="${esc(save.name)}" placeholder="vd: ChenChen" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">${cost?`Đổi (${GEM}${cost})`:'Lưu'}</button></form>
     <div class="subline" id="nmMsg"></div>
     <div class="btns"><button class="btn alt" id="nmBack">${first?'Để sau':'Quay lại'}</button></div></div>`);
+  const showAv=()=>{ $('#avPrev').innerHTML=avHTML(save.avatar,save.name,'big'); $('#avDel').hidden=!save.avatar; $('#avUp').textContent='📷 '+(save.avatar?'Đổi ảnh':'Tải ảnh lên'); fitCard(); };
+  $('#avUp').onclick=()=>$('#avFile').click();
+  $('#avFile').onchange=()=>{ const f=$('#avFile').files[0]; $('#avFile').value=''; if(!f) return;
+    if(!/^image\//.test(f.type)){ $('#nmMsg').textContent='Hãy chọn một tệp ảnh nhé.'; SFX.bad(); return; }
+    makeAvatar(f,d=>{ save.avatar=d; persist(); showAv(); sendAvatar(); $('#nmMsg').textContent='Đã đặt ảnh đại diện mới.'; SFX.ok(); },
+      ()=>{ $('#nmMsg').textContent='Không đọc được ảnh này, bạn thử ảnh khác nhé.'; SFX.bad(); }); };
+  $('#avDel').onclick=()=>{ save.avatar=''; persist(); showAv(); sendAvatar(); $('#nmMsg').textContent='Đã xoá ảnh đại diện.'; };
   $('#nmForm').onsubmit=e=>{e.preventDefault();
     const v=cleanName($('#nmIn').value); if(!v) return;
     if(badName(v)){ $('#nmMsg').textContent=BAD_MSG; SFX.bad(); return; }
@@ -1290,8 +1329,8 @@ function bindDevice(after){
   if(!save.name) return;
   api('POST',{action:'device',id:save.pid,name:save.name,fp:deviceFP()}).then(d=>{
     save.bound=1;
-    if(d.id&&d.id!==save.pid){ save.pid=d.id; if(d.name) save.name=d.name; persist(); oneAccount(d.name,after); return; }
-    persist();
+    if(d.id&&d.id!==save.pid){ save.pid=d.id; if(d.name) save.name=d.name; save.avatar=d.a||''; persist(); oneAccount(d.name,after); return; }
+    persist(); if(save.avatar) sendAvatar();
   }).catch(()=>{});
 }
 function oneAccount(name,next){
@@ -1341,8 +1380,8 @@ function showBoard(board,back){
   api('GET',null,`?board=${board}&me=${encodeURIComponent(save.pid)}`).then(d=>{
     const el=$('#lbList'); if(!el) return;
     if(!d.top||!d.top.length){ el.innerHTML='<li class="lbmsg" style="display:block">Chưa có ai trên bảng này. Chơi một màn để giành hạng 1!</li>'; return; }
-    let html=d.top.map((r,i)=>`<li class="${r.id===save.pid?'me':''}"><span class="rk">${i+1}</span><span class="nm">${nameT(r.name,r.t)}</span><span class="sc">${r.score}</span></li>`).join('');
-    if(d.me&&d.me.rank>d.top.length) html+=`<li class="me"><span class="rk">${d.me.rank}</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="sc">${d.me.score}</span></li>`;
+    let html=d.top.map((r,i)=>`<li class="${r.id===save.pid?'me':''}"><span class="rk">${i+1}</span>${avHTML(r.a,r.name)}<span class="nm">${nameT(r.name,r.t)}</span><span class="sc">${r.score}</span></li>`).join('');
+    if(d.me&&d.me.rank>d.top.length) html+=`<li class="me"><span class="rk">${d.me.rank}</span>${avHTML(save.avatar,save.name)}<span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="sc">${d.me.score}</span></li>`;
     el.innerHTML=html; fitCard();
   }).catch(()=>{
     const el=$('#lbList'); if(!el) return;
@@ -1401,7 +1440,10 @@ function endGame(win){
       $('#subForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#subName').value); if(!v) return; if(badName(v)){ toast(BAD_MSG); SFX.bad(); return; } if(reservedName(v)&&!save.owner){ toast(RES_MSG); SFX.bad(); return; } save.name=v; persist(); bindDevice(); send();};
     }
   };
-  setTimeout(()=>verdict(win,rows.length-right,rows.length,showResult), win?300:900);
+  // "Đồ học dốt!" is said the moment the round ends, and its popup comes straight up with it
+  const dumb=rows.length>0 && (rows.length-right)/rows.length>0.5;
+  if(dumb) playDumb();
+  setTimeout(()=>verdict(win,rows.length-right,rows.length,showResult), dumb?0:win?300:900);
 }
 /* Dictionary: every word the player has met, unlocked once with Gems */
 function openDict(lv,back,page=0){
@@ -1704,9 +1746,9 @@ function openGold(lang,back){
     const hon=$('#gHon'); if(hon&&d.honors.top.length){ hon.innerHTML=`<div class="ht">Vinh danh tuần trước (${weekRange(d.honors.week)})</div><div class="hl">${honorHTML(d.honors)}</div>`; hon.hidden=false; }
     const el=$('#gList'); if(!el) return;
     if(!d.top.length){ el.innerHTML=`<li class="lbmsg" style="display:block">Tuần này chưa ai lên Bảng vàng ${K.name}. Làm đề đạt ${lang==='en'?'từ '+K.pass+' điểm':'mức đạt'} để là người đầu tiên!</li>`; fitCard(); return; }
-    let html=d.top.slice(0,10).map((r,i)=>`<li class="${r.id===save.pid?'me':''}" data-pid="${esc(r.id)}"><span class="rk">${i+1}</span><span class="nm">${nameT(r.name,r.t)}</span><span class="n">${r.n} đề</span><span class="sc">${r.score}</span><span class="go">›</span></li>`).join('');
-    if(d.me&&d.me.rank>10) html+=`<li class="me" data-pid="${esc(save.pid)}"><span class="rk">${d.me.rank}</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n">${d.me.n} đề</span><span class="sc">${d.me.score}</span><span class="go">›</span></li>`;
-    else if(!d.me) html+=`<li class="me"><span class="rk">–</span><span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n" style="flex:1 1 auto;text-align:right">chưa lên bảng</span></li>`;
+    let html=d.top.slice(0,10).map((r,i)=>`<li class="${r.id===save.pid?'me':''}" data-pid="${esc(r.id)}"><span class="rk">${i+1}</span>${avHTML(r.a,r.name)}<span class="nm">${nameT(r.name,r.t)}</span><span class="n">${r.n} đề</span><span class="sc">${r.score}</span><span class="go">›</span></li>`).join('');
+    if(d.me&&d.me.rank>10) html+=`<li class="me" data-pid="${esc(save.pid)}"><span class="rk">${d.me.rank}</span>${avHTML(save.avatar,save.name)}<span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n">${d.me.n} đề</span><span class="sc">${d.me.score}</span><span class="go">›</span></li>`;
+    else if(!d.me) html+=`<li class="me"><span class="rk">–</span>${avHTML(save.avatar,save.name)}<span class="nm">${nameT(save.name||'Bạn',myTitle())}</span><span class="n" style="flex:1 1 auto;text-align:right">chưa lên bảng</span></li>`;
     el.innerHTML=html;
     el.querySelectorAll('[data-pid]').forEach(li=>li.onclick=()=>openGoldDetail(li.dataset.pid,lang,back));
     fitCard();
@@ -1726,7 +1768,9 @@ function openGoldDetail(pid,lang,back){
   $('#gdB').onclick=ret;
   api('GET',null,`?detail=${encodeURIComponent(pid)}&lang=${lang}`).then(d=>{
     if(!$('#gdH')) return;
-    $('#gdH').innerHTML=nameT(d.name,d.t);
+    $('#gdH').innerHTML=avHTML(d.a,d.name,'big')+nameT(d.name,d.t);
+    if(save.owner&&d.a&&pid!==save.pid){ const b=document.createElement('button'); b.className='btn alt'; b.style.cssText='display:block;margin:4px auto 0;font-size:13px;padding:4px 10px'; b.textContent='🚫 Gỡ ảnh này';
+      b.onclick=()=>api('POST',{action:'avatar',id:save.pid,target:pid,img:''}).then(()=>{ b.remove(); $('#gdH').querySelector('.av').outerHTML=avHTML('',d.name,'big'); }).catch(()=>toast('Chưa gỡ được ảnh.')); $('#gdH').after(b); }
     $('#gdS').innerHTML=d.rank?`Hạng <b>#${d.rank}</b> Bảng vàng ${K.name} · điểm <b>${d.score}</b>`:`Chưa lên Bảng vàng ${K.name} tuần này`;
     $('#gdL').innerHTML=d.exams.length?d.exams.map(x=>{const L=LEVELS.find(l=>l.id===x.lv);
       return `<li class="${x.pass?'':'no'}"><span class="ex">${esc(L?lvName(L):x.lv)} · Đề ${x.no}${x.pass?'':' <span class="raw">(chưa đạt)</span>'}</span><span class="raw">${x.score}${x.coef>1&&x.pass?` × ${x.coef}`:''}</span><span class="pt">${x.pts}</span></li>`;}).join('')
@@ -1776,8 +1820,7 @@ function verdict(win,wrong,total,next){
       <div class="bubble"><div class="say1">${T.say}</div><div class="ico">${T.icon}</div></div></div>
     <div class="hint" style="font-weight:700;margin-top:6px">${T.sub}</div>
     <button class="btn blue" id="vNext" style="width:100%;margin-top:12px">Xem kết quả</button></div>`);
-  if(kind==='dumb'){ playDumb(); }
-  else if(kind==='good'){ SFX.cluck(); }
+  if(kind==='good'){ SFX.cluck(); }
   let done=false; const go=()=>{ if(done) return; done=true; next(); };
   $('#vNext').onclick=go; setTimeout(go,4000);
 }
@@ -1799,7 +1842,7 @@ function splash(){
     // no account in this browser: the device may already have one (storage cleared, private tab)
     let done=false; const ask=()=>{ if(!done){ done=true; askName(menu); } };
     setTimeout(ask,2500);
-    api('GET',null,'?device='+deviceFP()).then(d=>{ if(done) return; if(d.id){ done=true; save.pid=d.id; save.name=d.name||''; save.bound=1; persist(); d.name?oneAccount(d.name,menu):askName(menu); } else ask(); }).catch(ask);
+    api('GET',null,'?device='+deviceFP()).then(d=>{ if(done) return; if(d.id){ done=true; save.pid=d.id; save.name=d.name||''; save.avatar=d.a||''; save.bound=1; persist(); d.name?oneAccount(d.name,menu):askName(menu); } else ask(); }).catch(ask);
   };
   $('#startBtn').onclick=go;
 }

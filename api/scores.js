@@ -4,6 +4,7 @@
 //      (zh = HSK golden board, scores /300, pass 180; en = TOEIC golden board, scores /990, pass 450)
 // POST /api/scores {id,name,level,mode,score}                     → { rankLang, rankLevel, total, best }
 // POST /api/scores {action:'rename',id,name}                      → { ok }
+// POST /api/scores {action:'avatar',id,img[,target]}               → { ok } (img = small data:image URL, '' removes; owners may clear another player's via target)
 // POST /api/scores {action:'exam',id,name,exam,score}             → { ok, dup, lang, avg, n, rank } (exam '<week>-hsk3-0' or '<week>-en2-1')
 // POST /api/scores {action:'claim',id,lang}                       → { ok, lang, rank, gems, week } (last week's top 3 of that board, once)
 // GET  /api/scores?device=<fp>                                   → { id, name } | {} (account already tied to this device)
@@ -130,6 +131,15 @@ function titleMap(...hs) {
   return t;
 }
 
+// Profile pictures: tiny square images (the game shrinks uploads to 96px) kept as data URLs in xx:avt
+const AVT_MAX = 24000;
+const validAvt = (s) => typeof s === 'string' && s.length <= AVT_MAX && /^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/]+=*$/.test(s);
+async function avatars(ids) {
+  if (!ids.length) return [];
+  const [a] = await redis([['HMGET', 'xx:avt', ...ids]]);
+  return (a || []).map((x) => x || '');
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (!URL_ || !TOKEN) return res.status(503).json({ error: 'leaderboard database not connected' });
@@ -145,8 +155,8 @@ module.exports = async (req, res) => {
       if (!validFp(req.query.device)) return res.status(400).json({ error: 'bad request' });
       const [id] = await redis([['GET', devKey(req, req.query.device)]]);
       if (!id) return res.status(200).json({});
-      const [name] = await redis([['HGET', 'xx:names', id]]);
-      return res.status(200).json({ id, name: shown(name, id) });
+      const [name, a] = await redis([['HGET', 'xx:names', id], ['HGET', 'xx:avt', id]]);
+      return res.status(200).json({ id, name: shown(name, id), a: a || '' });
     }
 
     if (req.method === 'GET') {
@@ -159,9 +169,9 @@ module.exports = async (req, res) => {
         // Where a golden-board score comes from: this week's exams for one player
         const id = req.query.detail;
         const lang = langOf(req.query.lang);
-        const [flat, name, sc, rank] = await redis([
+        const [flat, name, sc, rank, a] = await redis([
           ['HGETALL', 'xx:exams:' + id], ['HGET', 'xx:names', id],
-          ['ZSCORE', gold(week, lang), id], ['ZREVRANK', gold(week, lang), id],
+          ['ZSCORE', gold(week, lang), id], ['ZREVRANK', gold(week, lang), id], ['HGET', 'xx:avt', id],
         ]);
         const exams = [];
         for (let i = 0; i + 1 < (flat || []).length; i += 2) {
@@ -172,7 +182,7 @@ module.exports = async (req, res) => {
           exams.push({ lv: m[2], no: Number(m[3]) + 1, score, coef, pts: score >= passOf(m[2]) ? score * coef : 0, pass: score >= passOf(m[2]) });
         }
         exams.sort((x, y) => y.pts - x.pts);
-        return res.status(200).json({ id, lang, name: shown(name, id), t: titles[id] || 0, score: sc === null ? null : num(sc), rank: rank === null || rank === undefined ? null : rank + 1, exams });
+        return res.status(200).json({ id, lang, name: shown(name, id), a: a || '', t: titles[id] || 0, score: sc === null ? null : num(sc), rank: rank === null || rank === undefined ? null : rank + 1, exams });
       }
 
       if (req.query.gold) {
@@ -187,7 +197,8 @@ module.exports = async (req, res) => {
         const [names, counts] = ids.length
           ? await redis([['HMGET', 'xx:names', ...ids], ['HMGET', cnt_, ...ids]])
           : [[], []];
-        const top = ids.map((id, i) => ({ id, name: shown(names[i], id), score: num(scores[i]), n: Number(counts[i] || 0), t: titles[id] || 0 }));
+        const av = await avatars(ids);
+        const top = ids.map((id, i) => ({ id, name: shown(names[i], id), a: av[i], score: num(scores[i]), n: Number(counts[i] || 0), t: titles[id] || 0 }));
         const meOut = me && rank !== null && rank !== undefined ? { rank: rank + 1, score: num(score), n: Number(cnt || 0) } : null;
         return res.status(200).json({ week, lang, top, me: meOut, honors: h, other: lang === 'en' ? hz : he });
       }
@@ -198,7 +209,8 @@ module.exports = async (req, res) => {
       const [flat, rank, score] = await redis(cmds);
       const { ids, scores } = pairs(flat);
       const names = ids.length ? (await redis([['HMGET', 'xx:names', ...ids]]))[0] : [];
-      const top = ids.map((id, i) => ({ id, name: shown(names[i], id), score: Math.round(scores[i]), t: titles[id] || 0 }));
+      const av = await avatars(ids);
+      const top = ids.map((id, i) => ({ id, name: shown(names[i], id), a: av[i], score: Math.round(scores[i]), t: titles[id] || 0 }));
       const meOut = me && rank !== null && rank !== undefined ? { rank: rank + 1, score: Math.round(Number(score)) } : null;
       return res.status(200).json({ board, top, me: meOut, honors: hz, other: he });
     }
@@ -225,6 +237,20 @@ module.exports = async (req, res) => {
         if (id === b.id && name) await redis([['HSETNX', 'xx:names', id, name]]);
         const [nm] = await redis([['HGET', 'xx:names', id]]);
         return res.status(200).json({ id, name: shown(nm, id) });
+      }
+
+      if (b.action === 'avatar') {
+        if (!validId(b.id) || (b.img !== '' && !validAvt(b.img))) return res.status(400).json({ error: 'bad request' });
+        let id = b.id;
+        if (b.target !== undefined && b.target !== b.id) {
+          // the game's owner can take down someone else's picture
+          if (!validId(b.target) || !OWNERS.has(b.id) || b.img !== '') return res.status(403).json({ error: 'forbidden' });
+          id = b.target;
+        }
+        const [known] = await redis([['HEXISTS', 'xx:names', id]]);
+        if (!known) return res.status(200).json({ ok: false });
+        await redis([b.img ? ['HSET', 'xx:avt', id, b.img] : ['HDEL', 'xx:avt', id]]);
+        return res.status(200).json({ ok: true });
       }
 
       if (b.action === 'rename') {
