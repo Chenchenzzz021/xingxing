@@ -429,7 +429,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 14;
+const VERSION = 15;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -1011,10 +1011,10 @@ function menu(){
   setTower(1); $('#whpBar').style.width='100%'; $('#whpNum').textContent=100; $('#whp').className='whp';
   $('#hud').hidden=true; $('#timeBtn').hidden=true; stage.classList.remove('paused');
   if(save.examRun){ finishExam(menu); return; }
-  if(save.name&&badName(save.name)){
+  if(save.name&&(badName(save.name)||(reservedName(save.name)&&!save.owner))){
     save.forceRename=1; persist();
     showOverlay(`<div class="card pop-in" style="max-width:420px;text-align:center"><h2>Cần đổi tên</h2>
-      <div class="hint" style="margin:8px 0">Tên <b>${esc(save.name)}</b> trái với thuần phong mỹ tục Việt Nam nên không được dùng nữa. Bạn hãy đặt tên mới (miễn phí).</div>
+      <div class="hint" style="margin:8px 0">Tên <b>${esc(save.name)}</b> ${badName(save.name)?'trái với thuần phong mỹ tục Việt Nam':'có chữ "Chen" hoặc "Chiến", đã được chủ game giữ riêng'} nên không được dùng nữa. Bạn hãy đặt tên mới (miễn phí). Nếu bạn là chủ game, giữ nguyên tên và nhập mã chủ game.</div>
       <button class="btn big" id="frOk">Đặt tên mới</button></div>`);
     $('#frOk').onclick=()=>askName(menu); return;
   }
@@ -1078,7 +1078,15 @@ function askName(back){
   $('#nmForm').onsubmit=e=>{e.preventDefault();
     const v=cleanName($('#nmIn').value); if(!v) return;
     if(badName(v)){ $('#nmMsg').textContent=BAD_MSG; SFX.bad(); return; }
-    if(v===save.name&&!badName(save.name)){ back(); return; }
+    if(reservedName(v)&&!save.owner){
+      $('#nmMsg').innerHTML=esc(RES_MSG)+`<form class="namein" id="ownForm" style="margin-top:6px"><input id="ownIn" placeholder="Mã chủ game" aria-label="Mã chủ game" autocomplete="off"><button class="btn alt" type="submit">Xác nhận</button></form>`;
+      SFX.bad(); fitCard();
+      $('#ownForm').onsubmit=ev=>{ ev.preventDefault(); const code=$('#ownIn').value.trim(); if(!code) return;
+        api('POST',{action:'owner',id:save.pid,code}).then(d=>{ if(d.ok){ save.owner=1; persist(); $('#nmForm').requestSubmit(); } })
+          .catch(()=>{ $('#nmMsg').textContent='Mã chủ game không đúng.'; SFX.bad(); }); };
+      return;
+    }
+    if(v===save.name&&!badName(save.name)){ delete save.forceRename; persist(); back(); return; }
     if(!first){
       if(cost && save.gems<cost){ $('#nmMsg').textContent=`Cần ${cost} Gem để đổi tên, bạn đang có ${save.gems}.`; SFX.bad(); return; }
       save.gems-=cost; if(save.forceRename) delete save.forceRename; else save.renames=(save.renames||0)+1;
@@ -1111,6 +1119,15 @@ function badName(s){
   return joined.length<=4 && BAD_TOK.includes(joined);
 }
 
+// Names with "Chen" / "Chiến" (however spaced or disguised) are kept for the game's owner,
+// who unlocks them once per device with the owner code (checked by the server).
+function reservedName(s){
+  const k=String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d')
+    .replace(/[0@4]/g,m=>({'0':'o','@':'a','4':'a'})[m]).replace(/[1!|j]/g,'i').replace(/3/g,'e')
+    .replace(/[^a-z]/g,'').replace(/(.)\1+/g,'$1');
+  return k.includes('chen')||k.includes('chien');
+}
+const RES_MSG='Tên có chữ "Chen" hoặc "Chiến" đã được chủ game giữ riêng. Bạn hãy chọn tên khác nhé.';
 const BAD_MSG='Tên này trái với thuần phong mỹ tục Việt Nam. Bạn hãy chọn tên khác nhé.';
 function deviceFP(){
   let c='';
@@ -1232,7 +1249,7 @@ function endGame(win){
     else {
       box.innerHTML=`<div class="subline">Nhập tên tài khoản để lưu điểm (các màn sau sẽ tự lưu):</div><form class="namein" id="subForm"><input id="subName" maxlength="20" placeholder="Tên của bạn" aria-label="Tên người chơi" autocomplete="nickname"><button class="btn blue" type="submit">Lưu điểm</button></form>`;
       fitCard();
-      $('#subForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#subName').value); if(!v) return; if(badName(v)){ toast(BAD_MSG); SFX.bad(); return; } save.name=v; persist(); bindDevice(); send();};
+      $('#subForm').onsubmit=e=>{e.preventDefault(); const v=cleanName($('#subName').value); if(!v) return; if(badName(v)){ toast(BAD_MSG); SFX.bad(); return; } if(reservedName(v)&&!save.owner){ toast(RES_MSG); SFX.bad(); return; } save.name=v; persist(); bindDevice(); send();};
     }
   };
   setTimeout(()=>verdict(win,rows.length-right,rows.length,showResult), win?300:900);

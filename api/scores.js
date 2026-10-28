@@ -82,7 +82,17 @@ const gold = (w) => 'xx:gold:' + w;
 const validId = (s) => typeof s === 'string' && /^[a-z0-9]{6,32}$/.test(s);
 const cleanName = (s) =>
   String(s || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 20);
-const shown = (n) => (n && badName(n) ? 'Người chơi' : n || '');
+// Names containing "Chen" / "Chiến" (any spacing, accents, symbols or look-alike digits) belong to the
+// game's owner only. The owner proves it once per device with the owner code; only its hash lives here.
+const OWNER_HASH = 'ece32034ac4abbdbbd30902d82594eec406d7ff607868a0fc295e8e59602949f';
+function reservedName(s) {
+  const k = String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+    .replace(/[0@4]/g, (m) => ({ 0: 'o', '@': 'a', 4: 'a' })[m]).replace(/[1!|j]/g, 'i').replace(/3/g, 'e')
+    .replace(/[^a-z]/g, '').replace(/(.)\1+/g, '$1');
+  return k.includes('chen') || k.includes('chien');
+}
+let OWNERS = new Set();
+const shown = (n, id) => (n && (badName(n) || (reservedName(n) && !OWNERS.has(id))) ? 'Người chơi' : n || '');
 const devKey = (req, fp) => {
   const ip = String(req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
   return 'xx:dev:' + crypto.createHash('sha256').update(String(fp).slice(0, 64) + '|' + ip).digest('hex').slice(0, 32);
@@ -105,7 +115,7 @@ async function honors(week) {
   const [flat] = await redis([['ZRANGE', gold(week - 1), '0', '2', 'REV', 'WITHSCORES']]);
   const { ids, scores } = pairs(flat);
   const names = ids.length ? (await redis([['HMGET', 'xx:names', ...ids]]))[0] : [];
-  return { week: week - 1, top: ids.map((id, i) => ({ id, name: shown(names[i]), score: num(scores[i]), rank: i + 1 })) };
+  return { week: week - 1, top: ids.map((id, i) => ({ id, name: shown(names[i], id), score: num(scores[i]), rank: i + 1 })) };
 }
 const titleMap = (h) => Object.fromEntries(h.top.map((r) => [r.id, r.rank]));
 
@@ -113,6 +123,11 @@ module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (!URL_ || !TOKEN) return res.status(503).json({ error: 'leaderboard database not connected' });
   const week = weekId();
+  try {
+    OWNERS = new Set((await redis([['SMEMBERS', 'xx:owners']]))[0] || []);
+  } catch (e) {
+    OWNERS = new Set();
+  }
 
   try {
     if (req.method === 'GET' && req.query.device) {
@@ -120,7 +135,7 @@ module.exports = async (req, res) => {
       const [id] = await redis([['GET', devKey(req, req.query.device)]]);
       if (!id) return res.status(200).json({});
       const [name] = await redis([['HGET', 'xx:names', id]]);
-      return res.status(200).json({ id, name: shown(name) });
+      return res.status(200).json({ id, name: shown(name, id) });
     }
 
     if (req.method === 'GET') {
@@ -136,7 +151,7 @@ module.exports = async (req, res) => {
         const [names, counts] = ids.length
           ? await redis([['HMGET', 'xx:names', ...ids], ['HMGET', 'xx:gcnt:' + week, ...ids]])
           : [[], []];
-        const top = ids.map((id, i) => ({ id, name: shown(names[i]), score: num(scores[i]), n: Number(counts[i] || 0), t: titles[id] || 0 }));
+        const top = ids.map((id, i) => ({ id, name: shown(names[i], id), score: num(scores[i]), n: Number(counts[i] || 0), t: titles[id] || 0 }));
         const meOut = me && rank !== null && rank !== undefined ? { rank: rank + 1, score: num(score), n: Number(cnt || 0) } : null;
         return res.status(200).json({ week, top, me: meOut, honors: h });
       }
@@ -147,7 +162,7 @@ module.exports = async (req, res) => {
       const [flat, rank, score] = await redis(cmds);
       const { ids, scores } = pairs(flat);
       const names = ids.length ? (await redis([['HMGET', 'xx:names', ...ids]]))[0] : [];
-      const top = ids.map((id, i) => ({ id, name: shown(names[i]), score: Math.round(scores[i]), t: titles[id] || 0 }));
+      const top = ids.map((id, i) => ({ id, name: shown(names[i], id), score: Math.round(scores[i]), t: titles[id] || 0 }));
       const meOut = me && rank !== null && rank !== undefined ? { rank: rank + 1, score: Math.round(Number(score)) } : null;
       return res.status(200).json({ board, top, me: meOut, honors: h });
     }
@@ -157,13 +172,23 @@ module.exports = async (req, res) => {
       const name = cleanName(b.name);
       if (name && badName(name)) return res.status(400).json({ error: 'bad name' });
 
+      if (b.action === 'owner') {
+        const ok = validId(b.id) && crypto.createHash('sha256').update(String(b.code || '').trim().toUpperCase()).digest('hex') === OWNER_HASH;
+        if (ok) {
+          await redis([['SADD', 'xx:owners', b.id]]);
+          OWNERS.add(b.id);
+        }
+        return res.status(ok ? 200 : 403).json({ ok });
+      }
+      if (name && reservedName(name) && !OWNERS.has(b.id)) return res.status(400).json({ error: 'reserved name' });
+
       if (b.action === 'device') {
         if (!validId(b.id) || !validFp(b.fp)) return res.status(400).json({ error: 'bad request' });
         const k = devKey(req, b.fp);
         const [, id] = await redis([['SET', k, b.id, 'NX'], ['GET', k]]);
         if (id === b.id && name) await redis([['HSETNX', 'xx:names', id, name]]);
         const [nm] = await redis([['HGET', 'xx:names', id]]);
-        return res.status(200).json({ id, name: shown(nm) });
+        return res.status(200).json({ id, name: shown(nm, id) });
       }
 
       if (b.action === 'rename') {
