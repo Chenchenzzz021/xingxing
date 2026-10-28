@@ -87,6 +87,11 @@ button{font-family:inherit;color:inherit}
 .chk .tb i{display:block;height:100%;width:100%;background:var(--ok);transform-origin:left;will-change:transform}
 .chk.warn .tb i{background:var(--bad)}
 .chk.spawn{animation:pop .35s ease-out}
+.spd{display:flex;align-items:center;gap:8px;margin:6px 0 2px;font-weight:800;font-size:14px}
+.spd .bar{flex:1;height:10px;border:2px solid var(--ink);border-radius:8px;background:#fff;overflow:hidden}
+.spd .bar i{display:block;height:100%;background:linear-gradient(90deg,#ffb800,#ffe066);transform-origin:left;will-change:transform}
+.spd b{min-width:2.6em;text-align:right;color:#b45f00}
+.spd.low .bar i{background:#ff8a7a}.spd.low b{color:var(--bad)}
 /* Golden chicken: drops from the sky by parachute, worth SPECIAL_MUL points */
 .chk.special svg{filter:drop-shadow(0 0 7px #ffe066) drop-shadow(0 0 2px #ffb800)}
 .chk.special .q{background:#ffd84a;border-color:#7a4a00}
@@ -448,7 +453,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 22;
+const VERSION = 23;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -592,6 +597,14 @@ function playDumb(){
 
 /* ================= ART ================= */
 const INK='#2a2320';
+// Speed bonus: the clock starts when the chicken is tapped; it drains from SPEED_MAX to 0
+const SPEED_BASE=5, SPEED_MAX=25, SPEED_WIN=10000, SPEED_WIN_TYPE=16000;
+function speedPts(M){ const win=M.q.input?SPEED_WIN_TYPE:SPEED_WIN; return Math.round(SPEED_MAX*Math.max(0,1-(performance.now()-M.t0)/win)); }
+function speedTick(){
+  const M=G&&G.modal, el=$('#spd'); if(!M||!el) return;
+  if(!M.done){ const v=speedPts(M); el.querySelector('i').style.transform=`scaleX(${v/SPEED_MAX})`; el.querySelector('b').textContent='+'+v; el.classList.toggle('low',v<=SPEED_MAX*0.3); }
+  if(!M.done) requestAnimationFrame(speedTick);
+}
 const SPECIAL_MUL=3, SPECIAL_GEM=3, SPECIAL_LOOK={body:'#ffd84a',wing:'#f5bf1c',hat:'crown',weapon:'sword'};
 const CHUTE=`<svg class="chute" viewBox="0 0 120 70"><path d="M8 34 Q60 -18 112 34 Q99 26 86 34 Q73 26 60 34 Q47 26 34 34 Q21 26 8 34Z" fill="#ff5d5d" stroke="#2a2320" stroke-width="3"/><path d="M34 34 Q47 26 60 34 L60 34 Q47 26 34 34" fill="#fff"/><path d="M60 34 Q73 26 86 34 Q73 2 60 0 Q47 2 34 34 Q47 26 60 34Z" fill="#fff" stroke="#2a2320" stroke-width="3"/><path d="M10 35 L52 70 M36 35 L56 70 M84 35 L64 70 M110 35 L68 70" stroke="#2a2320" stroke-width="2"/></svg>`;
 const LOOKS=[
@@ -935,6 +948,7 @@ function openQuestion(c){
     <div class="qhead"><span class="pill">Gà số ${G.resolved+1}/${G.mode.total}</span><span>${G.level.name}</span></div>
     <div class="word"><div class="w ${q.showCls}">${esc(q.show)}</div><button class="say listen" id="sayBtn" aria-label="Nghe phát âm, trừ ${LISTEN_COST} điểm">${SPK}<span class="pen">-${LISTEN_COST}</span></button></div>
     <div class="prompt">${esc(q.prompt)}</div>
+    <div class="spd" id="spd" aria-label="Điểm tốc độ"><span>⚡ Tốc độ</span><div class="bar"><i></i></div><b>+${SPEED_MAX}</b></div>
     <div class="qtools"><button class="tool" id="hintBtn" ${save.gems<COST.hint?'disabled':''}>Gợi ý <span class="cost">${GEM}${COST.hint}</span></button></div>
     <div id="hintLine"></div>
     ${body}
@@ -949,6 +963,7 @@ function openQuestion(c){
   } else {
     ovl.querySelectorAll('.opt').forEach(b=>b.onclick=e=>{ if(tapOk(e)) checkChoice(b); });
   }
+  G.modal.t0=performance.now(); requestAnimationFrame(speedTick);
 }
 function useHint(){
   const M=G.modal; if(!M||M.done||M.hinted) return;
@@ -988,15 +1003,15 @@ function learn(L,w){ const a=save.learned[L.id]||(save.learned[L.id]=[]); if(!a.
 function answered(ok,exact){
   const M=G.modal, c=M.c, w=c.word, fb=$('#fb');
   learn(G.level,w);
-  const quick=(performance.now()-M.t0)<5000;
+  const spd=speedPts(M);
   if(ok){
     G.combo++;
-    let pts=10+(quick?5:0)+(exact?5:0)+Math.min(10,(G.combo-1)*2);
+    let pts=SPEED_BASE+spd+(exact?5:0)+Math.min(10,(G.combo-1)*2);
     if(M.listened) pts=Math.max(5,pts-LISTEN_COST);
     const mul=PTS_MUL[G.level.id]||1; pts=Math.round(pts*mul*(c.special?SPECIAL_MUL:1));
     G.score+=pts; G.log.push({w,ok:true}); c.logged=true; G.gemsEarned+=c.special?SPECIAL_GEM:1;
     SFX.ok(); speak(G.level.lang==='zh'?w.h:w.en,G.level.lang);
-    const extra=[c.special?`⭐ Gà vàng ×${SPECIAL_MUL}, +${SPECIAL_GEM} Gem`:'',mul>1?`Cấp độ ×${mul}`:'',M.listened?`Có nghe −${LISTEN_COST}`:'',exact?'Chuẩn cả thanh điệu! +5':'',quick?'Nhanh tay! +5':'',G.combo>1?`Liên hoàn x${G.combo}`:''].filter(Boolean).join(' · ');
+    const extra=[c.special?`⭐ Gà vàng ×${SPECIAL_MUL}, +${SPECIAL_GEM} Gem`:'',mul>1?`Cấp độ ×${mul}`:'',M.listened?`Có nghe −${LISTEN_COST}`:'',exact?'Chuẩn cả thanh điệu! +5':'',spd?`⚡ Tốc độ +${spd}`:'',G.combo>1?`Liên hoàn x${G.combo}`:''].filter(Boolean).join(' · ');
     fb.innerHTML=`<div class="fb ok"><b>Đúng rồi! +${pts}</b>${extra?' <span style="opacity:.8">('+extra+')</span>':''}<br>${revealLine(w)}</div>`; fitCard();
     setTimeout(()=>{ closeQuestion(); c.state='shot';
       fireAt(c,()=>{ SFX.pop(); boom(c.x,c.y-c.s*0.5,c.s*0.9); feathers(c.x,c.y-c.s*0.5,12); floatText(c.x,c.y-c.s,'+'+pts); removeChicken(c); resolveOne(); });
@@ -1606,7 +1621,7 @@ const TUT=[
   {t:'Chạm vào gà để trả lời',look:{body:'#fff6e3',wing:'#f1dfbb',hat:'viking',weapon:'axe'},
    b:`Gà mang từ vựng chạy về phía tường thành. <b>Chạm vào gà</b> để hiện câu hỏi: nghĩa, pinyin, hoặc gõ pinyin.<ul class="tl"><li>Trả lời <b>đúng</b>: pháo bắn hạ gà, bạn được điểm.</li><li>Trả lời <b>sai</b> hoặc để gà chạy tới: gà húc tường. Tường bị húc 4 lần là thua.</li></ul>`},
   {t:'Điểm và Gem 💎',look:{body:'#d79b5d',wing:'#bf8045',hat:'helmet',weapon:'shovel'},
-   b:`<ul class="tl"><li>Trả lời nhanh, đúng thanh điệu, đúng liên tiếp được thêm điểm. Cấp càng cao điểm càng nhiều.</li><li>Nút 🔊 trong câu hỏi giúp nghe lại từ, nhưng bị trừ ${LISTEN_COST} điểm.</li><li>Mỗi câu đúng được 1 Gem. Dùng Gem mua <b>Gợi ý</b>, <b>+10 giây</b>, mở <b>Từ điển</b> và mua <b>Đề thi HSK</b>.</li></ul>`},
+   b:`<ul class="tl"><li>Đồng hồ <b>⚡ Tốc độ</b> chạy ngay khi bạn chạm vào gà: trả lời <b>càng nhanh càng nhiều điểm</b>. Đúng thanh điệu, đúng liên tiếp cũng được thêm điểm. Cấp càng cao điểm càng nhiều.</li><li>Nút 🔊 trong câu hỏi giúp nghe lại từ, nhưng bị trừ ${LISTEN_COST} điểm.</li><li>Mỗi câu đúng được 1 Gem. Dùng Gem mua <b>Gợi ý</b>, <b>+10 giây</b>, mở <b>Từ điển</b> và mua <b>Đề thi HSK</b>.</li></ul>`},
   {t:'Màn chơi và thi HSK 🏆',look:{body:'#ffd84a',wing:'#f5bf1c',hat:'crown',weapon:'sword',chick:true},
    b:`<ul class="tl"><li>Mỗi cấp độ có 15–60 màn. Thắng thì bấm <b>Chơi tiếp</b> để sang màn sau, từ đã gặp không lặp lại.</li><li>Mỗi tuần có 3 đề thi mỗi cấp: <b>HSK</b> cho tiếng Trung (đạt từ ${EXAM_PASS}/${EXAM_MAX}) và <b>TOEIC</b> Nghe + Đọc cho tiếng Anh (đạt từ ${TOEIC_PASS}/${TOEIC_MAX}). Đạt thì được lên <b>Bảng vàng</b> riêng của mỗi loại, top 3 nhận danh hiệu và Gem.</li><li>Mỗi thiết bị chỉ dùng một tài khoản.</li></ul>`},
 ];

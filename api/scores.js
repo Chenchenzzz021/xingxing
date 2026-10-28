@@ -37,7 +37,7 @@ function badName(s){
 const LEVEL_IDS = ['hsk1', 'hsk2', 'hsk3', 'hsk4', 'hsk5', 'hsk6', 'en1', 'en2', 'en3'];
 const BOARDS = ['zh', 'en', 'all', ...LEVEL_IDS];
 const MODES = ['easy', 'normal', 'hard'];
-const MAX_SCORE = 3000; // one round can't reach this (18 chickens x 30 points x 2.6 at HSK 6)
+const MAX_SCORE = 4000; // one round can't reach this (18 chickens x 45 points x 2.6 at HSK 6, plus golden x3)
 const REWARD = { 1: 100, 2: 60, 3: 40 };
 const TOP = 50;
 
