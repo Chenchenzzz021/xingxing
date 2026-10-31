@@ -392,11 +392,6 @@ button{font-family:inherit;color:inherit}
 .card{min-width:0}
 .subline a{color:var(--royal);font-weight:800}
 .gi{width:1.05em;height:1.05em;vertical-align:-.17em;flex:none}
-#timeBtn{position:absolute;z-index:7000;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:6px;border:3px solid var(--ink);border-radius:999px;background:var(--paper);box-shadow:0 4px 0 var(--ink);padding:6px 12px 6px 8px;font-weight:800;font-size:16px;cursor:pointer;touch-action:manipulation}
-#timeBtn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
-#timeBtn .clk{width:26px;height:26px}
-#timeBtn .cost{display:flex;align-items:center;gap:2px;font-size:13px;background:var(--cream);border:2px solid var(--ink);border-radius:999px;padding:0 6px}
-#timeBtn.no{opacity:.55}
 .qtools{display:flex;justify-content:center;gap:8px;margin:-4px 0 10px;flex-wrap:wrap}
 .tool{display:flex;align-items:center;gap:6px;border:3px solid var(--ink);border-radius:999px;background:var(--gold);padding:4px 12px;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 3px 0 var(--ink)}
 .tool:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
@@ -458,7 +453,6 @@ button{font-family:inherit;color:inherit}
     <span class="num" id="hScore">0</span><span class="sep"></span><span class="num" id="hGem">0</span>
     <button class="ibtn" id="pauseBtn" aria-label="Tạm dừng"><svg viewBox="0 0 16 16"><rect x="3" y="2" width="3.5" height="12" rx="1" fill="#2a2320"/><rect x="9.5" y="2" width="3.5" height="12" rx="1" fill="#2a2320"/></svg></button>
   </div>
-  <button id="timeBtn" hidden aria-label="Thêm 10 giây cho gà đang chạy"><svg class="clk" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="14" r="10" fill="#fff" stroke="#2a2320" stroke-width="3"/><path d="M13 8v6l4 3" fill="none" stroke="#2a2320" stroke-width="3" stroke-linecap="round"/><path d="M10 2h6" stroke="#2a2320" stroke-width="3" stroke-linecap="round"/></svg>+10s<span class="cost" id="timeCost"></span></button>
   <div id="ovl"></div>
 </div>
 
@@ -508,7 +502,7 @@ const MODES = {
 };
 const DMG = 25;
 const LISTEN_COST = 5;
-const VERSION = 32;
+const VERSION = 33;
 // Higher levels are worth more per correct answer
 const PTS_MUL = {hsk1:1,hsk2:1.2,hsk3:1.5,hsk4:1.8,hsk5:2.2,hsk6:2.6,hsk7:3,en1:1,en2:1.5,en3:2};
 // Dictionary is unlocked per level; harder levels cost more
@@ -559,7 +553,7 @@ if(save.dict===true) save.dict={hsk1:true,hsk2:true,en1:true};
 save.dict=save.dict||{}; save.exams=save.exams||{}; save.claimed=save.claimed||{};
 const stageOf=L=>Math.min(L.stages,Math.max(1,save.stage[L.id]||1));
 const learnedOf=L=>save.learned[L.id]||[];
-const COST={hint:2,time:1};
+const COST={hint:2};
 const GEM='<svg class="gi" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2h10l4 5-9 11L1 7z" fill="#36c5f0" stroke="#2a2320" stroke-width="1.8" stroke-linejoin="round"/><path d="M1 7h18M7 2 5 7l5 11 5-11-2-5" fill="none" stroke="#2a2320" stroke-width="1.2" stroke-linejoin="round"/></svg>';
 function spend(n){ if(save.gems<n){ toast('Không đủ Gem. Trả lời đúng để nhận thêm Gem nhé!'); SFX.bad(); return false;} save.gems-=n; persist(); hud(); return true; }
 
@@ -862,12 +856,11 @@ function startGame(){
   stage.querySelectorAll('.ball,.puff,.float,.toast').forEach(e=>e.remove());
   G={level,mode,stage:stageOf(level),words:pickWords(level,mode.total),hp:100,score:0,combo:0,spawned:0,resolved:0,chks:[],t:0,lastSpawn:-99,paused:false,modal:null,log:[],over:false,qn:0,gemsEarned:0,special:specialSlots(mode.total)};
   wall.className='';
-  $('#hud').hidden=false; $('#timeBtn').hidden=false; hud(); closeOverlay();
+  $('#hud').hidden=false; hud(); closeOverlay();
   last=performance.now(); stage.classList.remove('paused');
 }
 const lvName=l=>(l.lang==='en'?'Anh ':'')+l.name;
 function hud(){
-  $('#timeCost').innerHTML=GEM+COST.time;
   if(!G) return;
   $('#hLvl').textContent=lvName(G.level)+' · Màn '+G.stage+(W<520?'':'/'+G.level.stages+' · '+G.mode.name);
   $('#hCount').textContent='🐔 '+G.resolved+'/'+G.mode.total;
@@ -875,7 +868,6 @@ function hud(){
   $('#hHp').classList.toggle('low',G.hp<=25);
   $('#hScore').textContent='★ '+G.score;
   $('#hGem').innerHTML=GEM+' '+save.gems;
-  $('#timeBtn').classList.toggle('no',save.gems<COST.time);
   setTower(G.hp>50?1:G.hp>25?2:3);
   $('#whpBar').style.width=G.hp+'%'; $('#whpNum').textContent=G.hp;
   $('#whp').classList.toggle('mid',G.hp<=50&&G.hp>25); $('#whp').classList.toggle('low',G.hp<=25);
@@ -1183,21 +1175,13 @@ function togglePause(){
   } else { G.paused=false; stage.classList.remove('paused'); closeOverlay(); last=performance.now(); }
 }
 $('#pauseBtn').onclick=togglePause;
-$('#timeBtn').addEventListener('click',()=>{
-  if(!G||G.paused||G.over) return;
-  const run=G.chks.filter(c=>c.state==='run');
-  if(!run.length){ toast('Chưa có con gà nào đang chạy.'); return; }
-  if(!spend(COST.time)) return;
-  for(const c of run){ const left=Math.max(0,c.dur-(G.t-c.start)); c.x0=c.x; c.start=G.t; c.dur=left+10; c.full=c.dur; }
-  SFX.open(); floatText(W*0.25,H*0.55,'+10 giây');
-});
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&G&&!G.paused&&!G.over&&!G.modal) togglePause(); });
 
 function starsFor(level){const b=save.best[level.id]; const n=b?b.stars:0; return [0,1,2].map(i=>`<span class="${i<n?'':'off'}">★</span>`).join('')}
 function menu(){
   if(G){ for(const c of G.chks) c.el.remove(); G=null; }
   setTower(1); $('#whpBar').style.width='100%'; $('#whpNum').textContent=100; $('#whp').className='whp';
-  $('#hud').hidden=true; $('#timeBtn').hidden=true; stage.classList.remove('paused');
+  $('#hud').hidden=true; stage.classList.remove('paused');
   if(save.examRun){ finishExam(menu); return; }
   if(save.name&&(badName(save.name)||(reservedName(save.name)&&!save.owner))){
     save.forceRename=1; persist();
@@ -1406,7 +1390,7 @@ function showBoard(board,back){
   });
 }
 function endGame(win){
-  if(G.over) return; G.over=true; G.paused=true; $('#timeBtn').hidden=true;
+  if(G.over) return; G.over=true; G.paused=true;
   for(const c of G.chks) c.el.remove(); G.chks=[];
   const L=G.level, stars=win?(G.hp>=100?3:G.hp>=50?2:1):0;
   if(win){ const b=save.best[L.id]||{stars:0,score:0}; save.best[L.id]={stars:Math.max(b.stars,stars),score:Math.max(b.score,G.score)}; SFX.win(); } else SFX.lose();
@@ -1436,7 +1420,6 @@ function endGame(win){
     ovl.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>speak(b.dataset.say,L.lang));
     $('#eAgain').onclick=startGame; $('#eMenu').onclick=menu; $('#eDict').onclick=()=>openDict(L.id,menu);
     if(hasNext) $('#eNext').onclick=()=>{save.set.lv=next.id; persist(); startGame()};
-    $('#timeBtn').hidden=true;
     const box=$('#subBox');
     const send=()=>{
       box.innerHTML='<div class="subline">Đang gửi điểm lên bảng xếp hạng...</div>';
@@ -1805,7 +1788,7 @@ const TUT=[
   {t:'Chạm vào gà để trả lời',look:{body:'#fff6e3',wing:'#f1dfbb',hat:'viking',weapon:'axe'},
    b:`Gà mang từ vựng chạy về phía tường thành. <b>Chạm vào gà</b> để hiện câu hỏi: nghĩa, pinyin, hoặc gõ pinyin.<ul class="tl"><li>Trả lời <b>đúng</b>: pháo bắn hạ gà, bạn được điểm.</li><li>Trả lời <b>sai</b> hoặc để gà chạy tới: gà húc tường. Tường bị húc 4 lần là thua.</li></ul>`},
   {t:'Điểm và Gem 💎',look:{body:'#d79b5d',wing:'#bf8045',hat:'helmet',weapon:'shovel'},
-   b:`<ul class="tl"><li>Đồng hồ <b>⚡ Tốc độ</b> chạy ngay khi bạn chạm vào gà: trả lời <b>càng nhanh càng nhiều điểm</b>. Đúng thanh điệu, đúng liên tiếp cũng được thêm điểm. Cấp càng cao điểm càng nhiều.</li><li>Nút 🔊 trong câu hỏi giúp nghe lại từ, nhưng bị trừ ${LISTEN_COST} điểm.</li><li>Mỗi câu đúng được 1 Gem. Dùng Gem mua <b>Gợi ý</b>, <b>+10 giây</b>, mở <b>Từ điển</b> và mua <b>Đề thi HSK</b>.</li></ul>`},
+   b:`<ul class="tl"><li>Đồng hồ <b>⚡ Tốc độ</b> chạy ngay khi bạn chạm vào gà: trả lời <b>càng nhanh càng nhiều điểm</b>. Đúng thanh điệu, đúng liên tiếp cũng được thêm điểm. Cấp càng cao điểm càng nhiều.</li><li>Nút 🔊 trong câu hỏi giúp nghe lại từ, nhưng bị trừ ${LISTEN_COST} điểm.</li><li>Mỗi câu đúng được 1 Gem. Dùng Gem mua <b>Gợi ý</b>, mở <b>Từ điển</b> và mua <b>Đề thi HSK</b>.</li></ul>`},
   {t:'Màn chơi và thi HSK 🏆',look:{body:'#ffd84a',wing:'#f5bf1c',hat:'crown',weapon:'sword',chick:true},
    b:`<ul class="tl"><li>Mỗi cấp độ có 15–60 màn. Thắng thì bấm <b>Chơi tiếp</b> để sang màn sau, từ đã gặp không lặp lại.</li><li>Mỗi tuần có 3 đề thi mỗi cấp: <b>HSK</b> cho tiếng Trung (Nghe, Đọc, Viết như đề thật, tối đa 35 phút) và <b>TOEIC</b> Nghe + Đọc cho tiếng Anh (đạt từ ${TOEIC_PASS}/${TOEIC_MAX}). Đạt thì được lên <b>Bảng vàng</b> riêng của mỗi loại, top 3 nhận danh hiệu và Gem.</li><li>Mỗi thiết bị chỉ dùng một tài khoản.</li></ul>`},
 ];
